@@ -43,7 +43,7 @@ def load_and_prepare_date(path: Path, window, step, test_size = 0.1):
 if __name__ == '__main__':
 	base_path = Path(getenv('SNOWFINCH_TRAINING_DATA_PATH'))
 	print('Preparing data...')
-	x_train, y_train, x_test, y_test = load_and_prepare_date(base_path)
+	x_train, y_train, x_test, y_test = load_and_prepare_date(base_path, 0.5 , 0.25)
 	print('Done')
 	print('Training model...')
 	train_model(x_train, y_train)
