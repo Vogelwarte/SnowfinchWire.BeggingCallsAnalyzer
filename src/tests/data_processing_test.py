@@ -114,7 +114,7 @@ class TestProcessingClasses:
         assert pd.Interval(2, 3) in intervals
         assert pd.Interval(5, 6) in intervals
 
-    def test_extracted_features_appropriate_length(self):
+    def test_extracted_features_appropriate_total_length(self):
         data = generate_nest_recoring(
 			sample_rate = 48000, length_sec = 60, label_count = 7,
 			brood_size = 3, brood_age = 10, labels = ['contact', 'feeding']
@@ -125,3 +125,28 @@ class TestProcessingClasses:
         features = extract_features(data.audio_data, data.audio_sample_rate, window, step, data.labels)
 
         assert features.shape[0] == duration / step - 1
+
+    def test_extracted_features_appropriate_window_length(self):
+        data = generate_nest_recoring(
+			sample_rate = 48000, length_sec = 60, label_count = 7,
+			brood_size = 3, brood_age = 10, labels = ['contact', 'feeding']
+		)
+        window = 0.5
+        step = 0.25
+        features = extract_features(data.audio_data, data.audio_sample_rate, window, step, data.labels)
+        time_index = pd.IntervalIndex(features['time'])
+        assert np.all(time_index.right == time_index.left + window)
+
+    def test_extracted_features_appropriate_window_step(self):
+        data = generate_nest_recoring(
+			sample_rate = 48000, length_sec = 60, label_count = 7,
+			brood_size = 3, brood_age = 10, labels = ['contact', 'feeding']
+		)
+        window = 0.5
+        step = 0.25
+        features = extract_features(data.audio_data, data.audio_sample_rate, window, step, data.labels)
+        lag = features['time'].shift(-1)
+        time_index = pd.IntervalIndex(features['time'])
+        lagged_interval_index = pd.IntervalIndex(lag)
+        assert (np.all(time_index.left[:-1] == lagged_interval_index.left[:-1] - step) and 
+                np.all(time_index.right[:-1] == lagged_interval_index.right[:-1] - step))
