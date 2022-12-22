@@ -1,0 +1,9 @@
+eyed3==0.9.7
+numpy==1.24.0
+pandas==1.5.2
+pyAudioAnalysis==0.3.14
+pydub==0.25.1
+pytest==7.2.0
+scikit-learn==1.2.0
+soundfile==0.11.0
+tqdm==4.64.1
