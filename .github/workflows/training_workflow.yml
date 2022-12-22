@@ -8,6 +8,8 @@ permissions:
 jobs:
   train:
     runs-on: self-hosted
+    env: 
+      SNOWFINCH_TRAINING_DATA_PATH: "~/Snowfinch-acoustics/AI_training_recordings"
     steps:
     - uses: actions/checkout@v3
     - name: Set up Python 3.9
