@@ -20,13 +20,13 @@ def fit_model(x_train: pd.DataFrame, y_train: pd.DataFrame) -> SVC:
 
 
 def load_and_prepare_data(path: Path, window, step, percentage_overlap, test_size = 0.1, extension = 'flac'):
-    flacs = list(path.glob(f'**/*.{extension}'))
+    files = list(path.glob(f'**/*.{extension}'))
 
-    train_paths, test_paths = train_test_split(flacs, test_size = test_size, random_state = 1)
+    train_paths, test_paths = train_test_split(files, test_size = test_size, random_state = 1)
     data = []
-    with tqdm(total = len(flacs)) as pbar:
-        for flac in train_paths:
-            file = load_recording_data(flac)
+    with tqdm(total = len(files)) as pbar:
+        for recording in train_paths:
+            file = load_recording_data(recording)
             duration = len(file.audio_data) / float(file.audio_sample_rate)
             df = extract_features(file.audio_data, file.audio_sample_rate, window, step)
             df = process_features_classes(df, file.labels, percentage_overlap, duration, window, step)
@@ -35,8 +35,8 @@ def load_and_prepare_data(path: Path, window, step, percentage_overlap, test_siz
         train = pd.concat(data, ignore_index = True)
 
         data.clear()
-        for flac in test_paths:
-            file = load_recording_data(flac)
+        for recording in test_paths:
+            file = load_recording_data(recording)
             duration = len(file.audio_data) / float(file.audio_sample_rate)
             df = extract_features(file.audio_data, file.audio_sample_rate, window, step)
             df = process_features_classes(df, file.labels, percentage_overlap, duration, window, step)

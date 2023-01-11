@@ -8,7 +8,7 @@ from spafe.utils.preprocessing import SlidingWindow
 
 def percentage_overlap(win: pd.Interval, interval: pd.Interval, percentage) -> bool:
     if percentage < 0 or percentage > 1:
-        raise ValueError("Percentage should be between 0 and 1")
+        raise ValueError(f"Percentage should be between 0 and 1, found {percentage}")
 
     win_size = win.length * percentage
     return win.overlaps(interval) and \

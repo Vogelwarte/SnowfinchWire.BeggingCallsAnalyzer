@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import pandas.api.types as ptypes
+import pytest
 from beggingcallsanalyzer.common.preprocessing.io import SnowfinchNestRecording
 from beggingcallsanalyzer.training.preprocessing import percentage_overlap, process_features_classes, extract_features
 
@@ -35,35 +36,47 @@ def generate_nest_recoring(
 
 
 class TestOverlappingIntervals:
-    def test_outer_interval_contains_window_returns_true(self):
+    @pytest.mark.parametrize("percentage", [0, 0.1, 0.3, 0.5, 0.7, 1])
+    def test_outer_interval_contains_window_returns_true(self, percentage):
         outer = pd.Interval(0, 10)
         window = pd.Interval(2, 8)
-        assert percentage_overlap(window, outer, 0.5) is True
+        assert percentage_overlap(window, outer, percentage) is True
 
-    def test_outer_interval_left_major_overlap_returns_true(self):
+    @pytest.mark.parametrize("percentage", [0, 0.1, 0.3, 0.5, 0.8])
+    def test_outer_interval_left_major_overlap_returns_true(self, percentage):
         outer = pd.Interval(0, 7)
         window = pd.Interval(2, 8)
-        assert percentage_overlap(window, outer, 0.5) is True
+        assert percentage_overlap(window, outer, percentage) is True
 
-    def test_outer_interval_right_major_overlap_returns_true(self):
+    @pytest.mark.parametrize("percentage", [0, 0.1, 0.3, 0.5, 0.8])
+    def test_outer_interval_right_major_overlap_returns_true(self, percentage):
         outer = pd.Interval(3, 10)
         window = pd.Interval(2, 8)
-        assert percentage_overlap(window, outer, 0.5) is True
+        assert percentage_overlap(window, outer, percentage) is True
 
-    def test_outer_interval_right_minor_overlap_returns_false(self):
+    @pytest.mark.parametrize("percentage", [0.4, 0.7, 0.8, 0.9])
+    def test_outer_interval_right_minor_overlap_returns_false(self, percentage):
         outer = pd.Interval(7, 10)
         window = pd.Interval(2, 8)
-        assert percentage_overlap(window, outer, 0.5) is False
+        assert percentage_overlap(window, outer, percentage) is False
 
-    def test_outer_interval_left_minor_overlap_returns_false(self):
+    @pytest.mark.parametrize("percentage", [0.2, 0.4, 0.7, 0.8, 0.9])
+    def test_outer_interval_left_minor_overlap_returns_false(self, percentage):
         outer = pd.Interval(0, 3)
         window = pd.Interval(2, 8)
-        assert percentage_overlap(window, outer, 0.5) is False
+        assert percentage_overlap(window, outer, percentage) is False
 
-    def test_no_overlap_returns_false(self):
+    @pytest.mark.parametrize("percentage", [0, 0.1, 0.3, 0.5, 0.7, 1])
+    def test_no_overlap_returns_false(self, percentage):
         outer = pd.Interval(0, 2)
         window = pd.Interval(4, 6)
-        assert percentage_overlap(window, outer, 0.5) is False
+        assert percentage_overlap(window, outer, percentage) is False
+
+    def test_incorrect_percentage(self):
+        outer = pd.Interval(0, 2)
+        window = pd.Interval(4, 6)
+        with pytest.raises(ValueError, match = "Percentage should be between 0 and 1, found 15"):
+            percentage_overlap(window, outer, 15)
 
 
 class TestProcessingClasses:
@@ -101,28 +114,6 @@ class TestProcessingClasses:
         df = process_features_classes(df, labels, overlap_percentage, duration, window, window)
         assert ptypes.is_integer_dtype(df['y'].dtype)
 
-    # def test_class_column_contains_correct_values(self):
-    #     labels = pd.DataFrame({
-    #         'label': ['feeding', 'feeding'],
-    #         'start': [1.0, 5.0],
-    #         'end': [3.2, 6.1]
-    #     })
-    #     duration = 11
-    #     window = 1
-    #     time = np.arange(0, duration - window, window)
-    #
-    #     df = pd.DataFrame({
-    #         'time': pd.arrays.IntervalArray.from_arrays(time, time + window)
-    #     })
-    #
-    #     result = process_features_classes(df, labels, 0.7, duration, window, window)
-    #     y1 = result[result['y'] == 1]
-    #     intervals = list(y1['time'])
-    #     assert len(y1) == 3
-    #     assert pd.Interval(1, 2) in intervals
-    #     assert pd.Interval(2, 3) in intervals
-    #     assert pd.Interval(5, 6) in intervals
-
     def test_extracted_features_appropriate_total_length(self):
         data = generate_nest_recoring(
             sample_rate = 48000, length_sec = 60, label_count = 7,
@@ -135,30 +126,15 @@ class TestProcessingClasses:
 
         assert features.shape[0] == duration / step - 1
 
-    # def test_extracted_features_appropriate_window_length(self):
-    #     data = generate_nest_recoring(
-    #         sample_rate = 48000, length_sec = 60, label_count = 7,
-    #         brood_size = 3, brood_age = 10, labels = ['contact', 'feeding']
-    #     )
-    #     window = 0.5
-    #     step = 0.25
-    #     features = extract_features(data.audio_data, data.audio_sample_rate, window, step)
-    #     time_index = pd.IntervalIndex(features['time'])
-    #     assert np.all(time_index.right == time_index.left + window)
-    #
-    # def test_extracted_features_appropriate_window_step(self):
-    #     data = generate_nest_recoring(
-    #         sample_rate = 48000, length_sec = 60, label_count = 7,
-    #         brood_size = 3, brood_age = 10, labels = ['contact', 'feeding']
-    #     )
-    #     window = 0.5
-    #     step = 0.25
-    #     duration = len(audio) / float(sample_rate)
-    #     time = np.arange(0, duration - step, step)
-    #     time_interval = pd.arrays.IntervalArray.from_arrays(time, time + window)
-    #     features = extract_features(data.audio_data, data.audio_sample_rate, window, step)
-    #     lag = time_interval.shift(-1)
-    #     time_index = pd.IntervalIndex(time_interval)
-    #     lagged_interval_index = pd.IntervalIndex(lag)
-    #     assert (np.all(time_index.left[:-1] == lagged_interval_index.left[:-1] - step) and
-    #             np.all(time_index.right[:-1] == lagged_interval_index.right[:-1] - step))
+    def test_extracted_features_contain_all_columns(self):
+        data = generate_nest_recoring(
+            sample_rate = 48000, length_sec = 60, label_count = 7,
+            brood_size = 3, brood_age = 10, labels = ['contact', 'feeding']
+        )
+        window = 0.5
+        step = 0.25
+        features = extract_features(data.audio_data, data.audio_sample_rate, window, step)
+        assert set(features.columns) == {*[f'bfcc_{i}' for i in range(13)], 'zcr', 'energy', 'energy_entropy',
+                                         'spectral_centroid', 'spectral_spread', 'spectral_entropy', 'spectral_flux',
+                                         'spectral_rolloff'}
+

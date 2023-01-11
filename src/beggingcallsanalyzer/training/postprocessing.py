@@ -3,24 +3,26 @@ import pandas as pd
 
 
 def post_process(y_pred: np.ndarray) -> np.ndarray:
-    y = y_pred.copy()
+    y1 = y_pred.copy()
     # include singular frames that are surrounded by detections
     for i in range(1, len(y_pred)-1):
         if y_pred[i-1] == 1 and y_pred[i+1] == 1:
-            y[i] = 1
+            y1[i] = 1
 
     # remove singular observations with no neighbors - most likely artifacts
-    for i in range(1, len(y_pred)-1):
-        if y_pred[i-1] == 0 and y_pred[i+1] == 0:
-            y[i] = 0
+    y2 = y1.copy()
+    for i in range(1, len(y1)-1):
+        if y1[i-1] == 0 and y1[i+1] == 0:
+            y2[i] = 0
 
-    return y
+    return y2
 
 def to_audacity_labels(y_pred, duration, window, step, result_label="feeding"):
     df_export = pd.DataFrame()
     df_export['y'] = y_pred
-    time = np.arange(0, duration - step, step)
-    df_export['time'] = pd.arrays.IntervalArray.from_arrays(time, time + window)
+    time = np.arange(0, duration, step)
+    time_interval = pd.arrays.IntervalArray.from_arrays(time, time + window)
+    df_export['time'] = time_interval[:len(df_export)]
     df_export = df_export[df_export['y'] == 1].reset_index(drop=True)
     interval_index = pd.IntervalIndex(df_export['time'], closed='both')
 
