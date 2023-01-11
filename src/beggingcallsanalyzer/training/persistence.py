@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from sklearn.svm import SVC
 from skops.io import dump, load
 
@@ -8,4 +10,5 @@ def load_model(path: str):
     return model
 
 def save_model(model: SVC, path: str) -> None:
+    Path(path).parent.mkdir(exist_ok = True, parents = True)
     dump(model, path)

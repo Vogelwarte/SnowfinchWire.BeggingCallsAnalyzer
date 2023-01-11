@@ -60,6 +60,7 @@ if __name__ == '__main__':
     clean_output_directory('.out')
     for win_length in [0.5, 0.6]:
         for overlap_percentage in [0.5, 0.7]:
+            print(f'Training window length {win_length} and overlap percentage {overlap_percentage}')
             print('Preparing data...')
             x_train, y_train, x_test, y_test = load_and_prepare_data(base_path, win_length, win_length,
                                                                      overlap_percentage)
