@@ -17,8 +17,9 @@ def percentage_overlap(win: pd.Interval, interval: pd.Interval, percentage) -> b
 
 
 def process_features_classes(df: pd.DataFrame, labels: pd.DataFrame, overlap_percentage, duration, window, step) -> pd.DataFrame:
-    time = np.arange(0, duration - step, step)
-    df['time'] = pd.arrays.IntervalArray.from_arrays(time, time + window)
+    time = np.arange(0, duration, step)
+    time_interval = pd.arrays.IntervalArray.from_arrays(time, time + window)
+    df['time'] = time_interval[:len(df)]
 
     labels['time'] = pd.arrays.IntervalArray.from_arrays(labels['start'].astype('float32'),
                                                          labels['end'].astype('float32'))
@@ -34,8 +35,6 @@ def process_features_classes(df: pd.DataFrame, labels: pd.DataFrame, overlap_per
 
 
 def extract_features(audio: np.ndarray, sample_rate: int, window: float, step: float) -> pd.DataFrame:
-    duration = len(audio) / float(sample_rate)
-
     bfccs = bfcc(audio,
                  fs = sample_rate,
                  window = SlidingWindow(window, step, "hamming")
@@ -49,8 +48,6 @@ def extract_features(audio: np.ndarray, sample_rate: int, window: float, step: f
     scaled_sp_features = MinMaxScaler().fit_transform(sp_features.T)
 
     sp_ft_df = pd.DataFrame(data = scaled_sp_features, columns = feature_names)
-    time = np.arange(0, duration - step, step)
-    sp_ft_df['time'] = pd.arrays.IntervalArray.from_arrays(time, time + window)
 
     ret_df = bfccs_df.join(sp_ft_df.loc[:,
                   ['zcr', 'energy', 'energy_entropy', 'spectral_centroid', 'spectral_spread', 'spectral_entropy',

@@ -19,8 +19,8 @@ def fit_model(x_train: pd.DataFrame, y_train: pd.DataFrame) -> SVC:
     return svm
 
 
-def load_and_prepare_data(path: Path, window, step, percentage_overlap, test_size = 0.1, extension = '.flac'):
-    flacs = list(path.glob(f'**/*.flac'))
+def load_and_prepare_data(path: Path, window, step, percentage_overlap, test_size = 0.1, extension = 'flac'):
+    flacs = list(path.glob(f'**/*.{extension}'))
 
     train_paths, test_paths = train_test_split(flacs, test_size = test_size, random_state = 1)
     data = []
