@@ -124,7 +124,7 @@ class TestProcessingClasses:
         duration = len(data.audio_data) / float(data.audio_sample_rate)
         features = extract_features(data.audio_data, data.audio_sample_rate, window, step)
 
-        assert features.shape[0] == duration / step - 1
+        assert features.shape[0] == duration / step + 1
 
     def test_extracted_features_contain_all_columns(self):
         data = generate_nest_recoring(
@@ -134,7 +134,7 @@ class TestProcessingClasses:
         window = 0.5
         step = 0.25
         features = extract_features(data.audio_data, data.audio_sample_rate, window, step)
-        assert set(features.columns) == {*[f'bfcc_{i}' for i in range(13)], 'zcr', 'energy', 'energy_entropy',
-                                         'spectral_centroid', 'spectral_spread', 'spectral_entropy', 'spectral_flux',
+        assert set(features.columns) == {*[f'mfcc_{i+1}' for i in range(13)], 'zcr', 'energy',
+                                         'spectral_centroid', 'spectral_spread', 'spectral_flux',
                                          'spectral_rolloff'}
 

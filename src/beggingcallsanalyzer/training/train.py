@@ -1,34 +1,39 @@
-from os import getenv
 from pathlib import Path
 from shutil import rmtree
 
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import MinMaxScaler
 from tqdm import tqdm
 
-from src.beggingcallsanalyzer.training.evaluation import evaluate_model
-from src.beggingcallsanalyzer.training.persistence import save_model
 from .preprocessing import extract_features, process_features_classes
 from ..common.preprocessing.io import load_recording_data
 
 
-def fit_model(x_train: pd.DataFrame, y_train: pd.DataFrame) -> SVC:
-    svm = SVC(C = 20, cache_size = 2000)
-    svm.fit(x_train, y_train)
-    return svm
+from typing import Union
 
 
-def load_and_prepare_data(path: Path, window, step, percentage_overlap, test_size = 0.1, extension = 'flac'):
+def fit_model(x_train: pd.DataFrame, y_train: Union[pd.DataFrame, pd.Series]) -> Pipeline:
+    pipe = Pipeline([
+        ('scaler', MinMaxScaler()),
+        ('svc', SVC(C = 20, cache_size = 2000))
+    ])
+    pipe.fit(x_train, y_train)
+    return pipe
+
+
+def load_and_prepare_data(path: Path, window, step, percentage_overlap, test_size = 0.1, extension = 'flac', window_type = 'hamming', show_progressbar = True) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series]:
     files = list(path.glob(f'**/*.{extension}'))
 
-    train_paths, test_paths = train_test_split(files, test_size = test_size, random_state = 1)
+    train_paths, test_paths = train_test_split(files, test_size = test_size, random_state = 2)
     data = []
-    with tqdm(total = len(files)) as pbar:
+    with tqdm(total = len(files), disable=not show_progressbar) as pbar:
         for recording in train_paths:
             file = load_recording_data(recording)
             duration = len(file.audio_data) / float(file.audio_sample_rate)
-            df = extract_features(file.audio_data, file.audio_sample_rate, window, step)
+            df = extract_features(file.audio_data, file.audio_sample_rate, window, step, window_type)
             df = process_features_classes(df, file.labels, percentage_overlap, duration, window, step)
             data.append(df)
             pbar.update()
@@ -38,7 +43,7 @@ def load_and_prepare_data(path: Path, window, step, percentage_overlap, test_siz
         for recording in test_paths:
             file = load_recording_data(recording)
             duration = len(file.audio_data) / float(file.audio_sample_rate)
-            df = extract_features(file.audio_data, file.audio_sample_rate, window, step)
+            df = extract_features(file.audio_data, file.audio_sample_rate, window, step, window_type)
             df = process_features_classes(df, file.labels, percentage_overlap, duration, window, step)
             data.append(df)
             pbar.update()
@@ -53,20 +58,3 @@ def clean_output_directory(path):
             path.unlink()
         elif path.is_dir():
             rmtree(path)
-
-
-if __name__ == '__main__':
-    base_path = Path(getenv('SNOWFINCH_TRAINING_DATA_PATH'))
-    clean_output_directory('.out')
-    for win_length in [0.5, 0.6]:
-        for overlap_percentage in [0.5, 0.7]:
-            print(f'Training window length {win_length} and overlap percentage {overlap_percentage}')
-            print('Preparing data...')
-            x_train, y_train, x_test, y_test = load_and_prepare_data(base_path, win_length, win_length,
-                                                                     overlap_percentage)
-            print('Done')
-            print('Training model...')
-            model = fit_model(x_train, y_train)
-            save_model(model, f'.out/svm_win{win_length}_ov{overlap_percentage}.skops')
-            evaluate_model(model, x_test, y_test)
-            print('Done')

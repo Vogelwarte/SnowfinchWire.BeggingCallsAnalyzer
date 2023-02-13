@@ -1,21 +1,39 @@
 import numpy as np
 import pandas as pd
+import math
 
 
-def post_process(y_pred: np.ndarray) -> np.ndarray:
-    y1 = y_pred.copy()
-    # include singular frames that are surrounded by detections
-    for i in range(1, len(y_pred)-1):
-        if y_pred[i-1] == 1 and y_pred[i+1] == 1:
-            y1[i] = 1
+def post_process(y_pred: np.ndarray, win_length, hop_length, merge_window, cut_length) -> np.ndarray:
+    pred_len = len(y_pred)
 
-    # remove singular observations with no neighbors - most likely artifacts
-    y2 = y1.copy()
-    for i in range(1, len(y1)-1):
-        if y1[i-1] == 0 and y1[i+1] == 0:
-            y2[i] = 0
+    # remove very short observations - most likely artifacts
+    i = 0
+    while i < len(y_pred):
+        if y_pred[i] == 1:
+            right_idx = i + 1
+            while right_idx < len(y_pred) and y_pred[right_idx] == 1:
+                right_idx = right_idx + 1
+            difference = right_idx - i
+            if difference * hop_length <= cut_length:
+                for j in range(i, right_idx):
+                    y_pred[j] = 0
+            i = right_idx
+        else:
+            i = i + 1
 
-    return y2
+
+    # merge observations that are very close to each other
+    check_range = math.floor(merge_window/hop_length)
+    
+    for i in range(0, pred_len):
+        if y_pred[i] == 1:
+            for j in range(1, check_range + 1):
+                left_idx = max(i - j, 0)
+                if y_pred[left_idx] == 1:
+                    for k in range(left_idx, i):
+                        y_pred[k] = 1
+
+    return y_pred
 
 def to_audacity_labels(y_pred, duration, window, step, result_label="feeding"):
     df_export = pd.DataFrame()

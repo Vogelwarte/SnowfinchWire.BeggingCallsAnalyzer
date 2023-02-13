@@ -8,22 +8,22 @@ class TestPostprocessing:
         y_pred = np.array(
             [0, 1, 0, 0, 1, 1, 0, 0, 1, 0]
         )
-        y = post_process(y_pred)
+        y = post_process(y_pred, 1, 1, 2, 1)
         assert np.all(y == np.array([0, 0, 0, 0, 1, 1, 0, 0, 0, 0]))
 
     def test_neighbor_joining(self):
         y_pred = np.array(
-            [0, 0, 1, 0, 1, 1, 0, 1, 0, 0]
+            [0, 1, 1, 0, 1, 1, 0, 0, 0, 0]
         )
-        y = post_process(y_pred)
-        assert np.all(y == np.array([0, 0, 1, 1, 1, 1, 1, 1, 0, 0]))
+        y = post_process(y_pred, 1, 1, 2, 1)
+        assert np.all(y == np.array([0, 1, 1, 1, 1, 1, 0, 0, 0, 0]))
 
     def test_removal_and_joining_order(self):
         y_pred = np.array(
-            [0, 0, 1, 0, 1, 1, 0, 0, 1, 0, 0]
+            [0, 1, 1, 0, 1, 1, 0, 1, 0, 0, 0]
         )
-        y = post_process(y_pred)
-        assert np.all(y == np.array([0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0]))
+        y = post_process(y_pred, 1, 1, 2, 1)
+        assert np.all(y == np.array([0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0]))
 
     def test_audacity_labels_columns(self):
         y_pred = np.array(

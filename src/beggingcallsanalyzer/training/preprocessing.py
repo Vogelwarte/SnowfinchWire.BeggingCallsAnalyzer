@@ -1,9 +1,9 @@
 import numpy as np
 import pandas as pd
-from pyAudioAnalysis import ShortTermFeatures as aF
-from sklearn.preprocessing import MinMaxScaler
-from spafe.features.bfcc import bfcc
-from spafe.utils.preprocessing import SlidingWindow
+from librosa.feature import spectral_centroid, spectral_rolloff, zero_crossing_rate, rms
+from pyACA import FeatureSpectralSpread, FeatureSpectralFlux
+from librosa.feature import melspectrogram, mfcc
+from librosa.core.spectrum import power_to_db, _spectrogram
 
 
 def percentage_overlap(win: pd.Interval, interval: pd.Interval, percentage) -> bool:
@@ -17,7 +17,7 @@ def percentage_overlap(win: pd.Interval, interval: pd.Interval, percentage) -> b
 
 
 def process_features_classes(df: pd.DataFrame, labels: pd.DataFrame, overlap_percentage, duration, window, step) -> pd.DataFrame:
-    time = np.arange(0, duration, step)
+    time = np.arange(0, duration + step, step)
     time_interval = pd.arrays.IntervalArray.from_arrays(time, time + window)
     df['time'] = time_interval[:len(df)]
 
@@ -27,29 +27,29 @@ def process_features_classes(df: pd.DataFrame, labels: pd.DataFrame, overlap_per
     df['y'] = 0
     for i in range(df.shape[0]):
         for interv in feeding_intervals:
-            window_interv: pd.Interval = df.loc[i, 'time']
+            window_interv = df.loc[i, 'time']
             if percentage_overlap(window_interv, interv, overlap_percentage):
                 df.loc[i, 'y'] = 1
 
     return df.drop(columns = ['time'])
 
 
-def extract_features(audio: np.ndarray, sample_rate: int, window: float, step: float) -> pd.DataFrame:
-    bfccs = bfcc(audio,
-                 fs = sample_rate,
-                 window = SlidingWindow(window, step, "hamming")
-                 )
-    scaled_bfccs = MinMaxScaler().fit_transform(bfccs)
-    bfccs_df = pd.DataFrame(scaled_bfccs, columns = [f'bfcc_{i}' for i in range(bfccs.shape[1])])
+def extract_features(data: np.ndarray, sample_rate: int, win_length: float, hop_length: float, window_type='hamming') -> pd.DataFrame:
+    n_mfcc=13
 
-    sp_features, feature_names = aF.feature_extraction(audio, sample_rate,
-                                                       int(sample_rate * window),
-                                                       int(sample_rate * step))
-    scaled_sp_features = MinMaxScaler().fit_transform(sp_features.T)
+    win_length = round(win_length*sample_rate)
+    hop_length = round(hop_length*sample_rate)
+    spec, _ = _spectrogram(y=data, n_fft=win_length, hop_length=hop_length, window=window_type)
+    mel_spec = melspectrogram(S=spec, sr=sample_rate)
+    mfccs = mfcc(S=power_to_db(mel_spec), n_mfcc=n_mfcc).T
 
-    sp_ft_df = pd.DataFrame(data = scaled_sp_features, columns = feature_names)
+    centroid = spectral_centroid(S=spec, sr=sample_rate).flatten()
+    roloff = spectral_rolloff(S=spec, sr=sample_rate).flatten()
+    zcr = zero_crossing_rate(data, frame_length=win_length, hop_length=hop_length).flatten()
+    energy = rms(S=spec, frame_length=win_length, hop_length=hop_length).flatten()
+    spread = FeatureSpectralSpread(spec, sample_rate)
+    flux = FeatureSpectralFlux(spec, sample_rate)
+    ret_df = pd.DataFrame([*mfccs.T, zcr, energy, centroid, spread, flux , roloff]).T
+    ret_df.columns = [*[f'mfcc_{i+1}' for i in range(n_mfcc)], 'zcr', 'energy','spectral_centroid', 'spectral_spread', 'spectral_flux', 'spectral_rolloff']
 
-    ret_df = bfccs_df.join(sp_ft_df.loc[:,
-                  ['zcr', 'energy', 'energy_entropy', 'spectral_centroid', 'spectral_spread', 'spectral_entropy',
-                   'spectral_flux', 'spectral_rolloff']])
     return ret_df
