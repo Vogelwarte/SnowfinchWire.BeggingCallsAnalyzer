@@ -4,6 +4,7 @@ import pandas.api.types as ptypes
 import pytest
 from beggingcallsanalyzer.common.preprocessing.io import SnowfinchNestRecording
 from beggingcallsanalyzer.training.preprocessing import percentage_overlap, process_features_classes, extract_features
+from beggingcallsanalyzer.utilities.exceptions import ArgumentError
 
 
 def generate_audio(sample_rate: int, length_sec: int) -> np.ndarray:
@@ -75,66 +76,95 @@ class TestOverlappingIntervals:
     def test_incorrect_percentage(self):
         outer = pd.Interval(0, 2)
         window = pd.Interval(4, 6)
-        with pytest.raises(ValueError, match = "Percentage should be between 0 and 1, found 15"):
+        with pytest.raises(ArgumentError, match = "Overlap percentage should be between 0 and 1, found 15"):
             percentage_overlap(window, outer, 15)
 
 
-class TestProcessingClasses:
-    def test_processed_features_contain_class_column(self):
-        labels = pd.DataFrame({
-            'label': ['feeding', 'feeding'],
-            'start': [1.0, 5.0],
-            'end': [3.2, 6.1]
-        })
-        duration = 11
-        window = 1
-        time = np.arange(0, duration - window, window)
-        overlap_percentage = 0.7
+@pytest.fixture
+def feature_classes_processing_input():
+    labels = pd.DataFrame({
+        'label': ['feeding', 'feeding'],
+        'start': [1.0, 5.0],
+        'end': [3.2, 6.1]
+    })
+    duration = 11
+    window = 1
+    time = np.arange(0, duration - window, window)
+    overlap_percentage = 0.7
+    df = pd.DataFrame({
+        'time': pd.arrays.IntervalArray.from_arrays(time, time + window)
+    })
+    return labels, duration, window, overlap_percentage, df
 
-        df = pd.DataFrame({
-            'time': pd.arrays.IntervalArray.from_arrays(time, time + window)
-        })
+
+@pytest.fixture
+def extract_features_input():
+    data = generate_nest_recoring(
+        sample_rate = 48000, length_sec = 60, label_count = 7,
+        brood_size = 3, brood_age = 10, labels = ['contact', 'feeding']
+    )
+    window = 0.5
+    hop = 0.25
+    return data, window, hop
+
+
+class TestProcessingClasses:
+    def test_processed_features_contain_class_column(self, feature_classes_processing_input):
+        labels, duration, window, overlap_percentage, df = feature_classes_processing_input
+
         df = process_features_classes(df, labels, overlap_percentage, duration, window, window)
         assert 'y' in df.columns
 
-    def test_class_column_contains_valid_values(self):
-        labels = pd.DataFrame({
-            'label': ['feeding', 'feeding'],
-            'start': [1.0, 5.0],
-            'end': [3.2, 6.1]
-        })
-        duration = 11
-        window = 1
-        time = np.arange(0, duration - window, window)
-        overlap_percentage = 0.7
+    def test_processed_features_negative_duration_should_throw(self, feature_classes_processing_input):
+        labels, _, window, overlap_percentage, df = feature_classes_processing_input
+        duration = -2
 
-        df = pd.DataFrame({
-            'time': pd.arrays.IntervalArray.from_arrays(time, time + window)
-        })
+        with pytest.raises(ArgumentError, match = 'Duration has to be positive'):
+            process_features_classes(df, labels, overlap_percentage, duration, window, window)
+
+    def test_processed_features_negative_window_should_throw(self, feature_classes_processing_input):
+        labels, duration, hop, overlap_percentage, df = feature_classes_processing_input
+        window = -2
+
+        with pytest.raises(ArgumentError, match = 'Window.* has to be positive'):
+            process_features_classes(df, labels, overlap_percentage, duration, window, hop)
+
+    def test_processed_features_negative_hop_should_throw(self, feature_classes_processing_input):
+        labels, duration, window, overlap_percentage, df = feature_classes_processing_input
+        hop = -2
+
+        with pytest.raises(ArgumentError, match = 'Hop.* has to be positive'):
+            process_features_classes(df, labels, overlap_percentage, duration, window, hop)
+
+    def test_processed_features_column_contains_valid_values(self, feature_classes_processing_input):
+        labels, duration, window, overlap_percentage, df = feature_classes_processing_input
         df = process_features_classes(df, labels, overlap_percentage, duration, window, window)
         assert ptypes.is_integer_dtype(df['y'].dtype)
 
-    def test_extracted_features_appropriate_total_length(self):
-        data = generate_nest_recoring(
-            sample_rate = 48000, length_sec = 60, label_count = 7,
-            brood_size = 3, brood_age = 10, labels = ['contact', 'feeding']
-        )
-        window = 0.5
-        step = 0.25
+    def test_extracted_features_negative_window_should_throw(self, extract_features_input):
+        data, _, step = extract_features_input
+        window = -2
+
+        with pytest.raises(ArgumentError, match = 'Window.* has to be positive'):
+            extract_features(data.audio_data, data.audio_sample_rate, window, step)
+
+    def test_extracted_features_negative_hop_should_throw(self, extract_features_input):
+        data, window, _ = extract_features_input
+        step = -2
+
+        with pytest.raises(ArgumentError, match = 'Hop.* has to be positive'):
+            extract_features(data.audio_data, data.audio_sample_rate, window, step)
+
+    def test_extracted_features_appropriate_total_length(self, extract_features_input):
+        data, window, step = extract_features_input
         duration = len(data.audio_data) / float(data.audio_sample_rate)
         features = extract_features(data.audio_data, data.audio_sample_rate, window, step)
 
         assert features.shape[0] == duration / step + 1
 
-    def test_extracted_features_contain_all_columns(self):
-        data = generate_nest_recoring(
-            sample_rate = 48000, length_sec = 60, label_count = 7,
-            brood_size = 3, brood_age = 10, labels = ['contact', 'feeding']
-        )
-        window = 0.5
-        step = 0.25
+    def test_extracted_features_contain_all_columns(self, extract_features_input):
+        data, window, step = extract_features_input
         features = extract_features(data.audio_data, data.audio_sample_rate, window, step)
-        assert set(features.columns) == {*[f'mfcc_{i+1}' for i in range(13)], 'zcr', 'energy',
+        assert set(features.columns) == {*[f'mfcc_{i + 1}' for i in range(13)], 'zcr', 'energy',
                                          'spectral_centroid', 'spectral_spread', 'spectral_flux',
                                          'spectral_rolloff'}
-

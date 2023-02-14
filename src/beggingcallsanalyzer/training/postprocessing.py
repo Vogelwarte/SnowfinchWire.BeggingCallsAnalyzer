@@ -2,9 +2,19 @@ import numpy as np
 import pandas as pd
 import math
 
+from ..utilities.exceptions import ArgumentError
+
 
 def post_process(y_pred: np.ndarray, win_length, hop_length, merge_window, cut_length) -> np.ndarray:
     pred_len = len(y_pred)
+    if win_length <= 0:
+        raise ArgumentError('Window length has to be positive.')
+    if hop_length <= 0:
+        raise ArgumentError('Hop length has to be positive')
+    if merge_window <= 0:
+        raise ArgumentError('Maximum merge distance has to be positive')
+    if cut_length <= 0:
+        raise ArgumentError('Maximum cut length has to be positive')
 
     # remove very short observations - most likely artifacts
     i = 0
@@ -21,7 +31,6 @@ def post_process(y_pred: np.ndarray, win_length, hop_length, merge_window, cut_l
         else:
             i = i + 1
 
-
     # merge observations that are very close to each other
     check_range = math.floor(merge_window/hop_length)
     
@@ -35,11 +44,16 @@ def post_process(y_pred: np.ndarray, win_length, hop_length, merge_window, cut_l
 
     return y_pred
 
-def to_audacity_labels(y_pred, duration, window, step, result_label="feeding"):
+def to_audacity_labels(y_pred, duration, win_length, hop_length, result_label="feeding"):
+    if win_length <= 0:
+        raise ArgumentError('Window length has to be positive.')
+    if hop_length <= 0:
+        raise ArgumentError('Hop length has to be positive')
+
     df_export = pd.DataFrame()
     df_export['y'] = y_pred
-    time = np.arange(0, duration, step)
-    time_interval = pd.arrays.IntervalArray.from_arrays(time, time + window)
+    time = np.arange(0, duration + hop_length, hop_length)
+    time_interval = pd.arrays.IntervalArray.from_arrays(time, time + win_length)
     df_export['time'] = time_interval[:len(df_export)]
     df_export = df_export[df_export['y'] == 1].reset_index(drop=True)
     interval_index = pd.IntervalIndex(df_export['time'], closed='both')

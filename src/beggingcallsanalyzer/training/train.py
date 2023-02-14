@@ -14,6 +14,8 @@ from ..common.preprocessing.io import load_recording_data
 
 from typing import Union
 
+from ..utilities.exceptions import ArgumentError
+
 
 def fit_model(x_train: pd.DataFrame, y_train: Union[pd.DataFrame, pd.Series]) -> Pipeline:
     pipe = Pipeline([
@@ -25,6 +27,10 @@ def fit_model(x_train: pd.DataFrame, y_train: Union[pd.DataFrame, pd.Series]) ->
 
 
 def load_and_prepare_data(path: Path, window, step, percentage_overlap, test_size = 0.1, extension = 'flac', window_type = 'hamming', show_progressbar = True) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series]:
+    if not path.exists():
+        raise ArgumentError("Provided path is incorrect, it does not exist")
+    elif path.is_file():
+        raise ArgumentError("Provided path is incorrect, it should be a directory")
     files = list(path.glob(f'**/*.{extension}'))
 
     train_paths, test_paths = train_test_split(files, test_size = test_size, random_state = 2)
@@ -52,8 +58,8 @@ def load_and_prepare_data(path: Path, window, step, percentage_overlap, test_siz
     return train.drop(columns = ['y']), train['y'], test.drop(columns = ['y']), test['y']
 
 
-def clean_output_directory(path):
-    for path in Path(path).glob("**/*"):
+def clean_output_directory(path: Path):
+    for path in path.glob("**/*"):
         if path.is_file():
             path.unlink()
         elif path.is_dir():

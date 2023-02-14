@@ -5,10 +5,12 @@ from pyACA import FeatureSpectralSpread, FeatureSpectralFlux
 from librosa.feature import melspectrogram, mfcc
 from librosa.core.spectrum import power_to_db, _spectrogram
 
+from ..utilities.exceptions import ArgumentError
+
 
 def percentage_overlap(win: pd.Interval, interval: pd.Interval, percentage) -> bool:
     if percentage < 0 or percentage > 1:
-        raise ValueError(f"Percentage should be between 0 and 1, found {percentage}")
+        raise ArgumentError(f"Overlap percentage should be between 0 and 1, found {percentage}")
 
     win_size = win.length * percentage
     return win.overlaps(interval) and \
@@ -16,9 +18,16 @@ def percentage_overlap(win: pd.Interval, interval: pd.Interval, percentage) -> b
          (win.right - win_size) > interval.left and win.right < interval.right)
 
 
-def process_features_classes(df: pd.DataFrame, labels: pd.DataFrame, overlap_percentage, duration, window, step) -> pd.DataFrame:
-    time = np.arange(0, duration + step, step)
-    time_interval = pd.arrays.IntervalArray.from_arrays(time, time + window)
+def process_features_classes(df: pd.DataFrame, labels: pd.DataFrame, overlap_percentage, duration, win_length, hop_length) -> pd.DataFrame:
+    if win_length <= 0:
+        raise ArgumentError('Window length has to be positive.')
+    if hop_length <= 0:
+        raise ArgumentError('Hop length has to be positive')
+    if duration <= 0:
+        raise ArgumentError('Duration has to be positive')
+
+    time = np.arange(0, duration + hop_length, hop_length)
+    time_interval = pd.arrays.IntervalArray.from_arrays(time, time + win_length)
     df['time'] = time_interval[:len(df)]
 
     labels['time'] = pd.arrays.IntervalArray.from_arrays(labels['start'].astype('float32'),
@@ -35,6 +44,11 @@ def process_features_classes(df: pd.DataFrame, labels: pd.DataFrame, overlap_per
 
 
 def extract_features(data: np.ndarray, sample_rate: int, win_length: float, hop_length: float, window_type='hamming') -> pd.DataFrame:
+    if win_length <= 0:
+        raise ArgumentError('Window length has to be positive.')
+    if hop_length <= 0:
+        raise ArgumentError('Hop length has to be positive')
+
     n_mfcc=13
 
     win_length = round(win_length*sample_rate)
