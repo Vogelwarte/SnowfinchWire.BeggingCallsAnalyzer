@@ -31,7 +31,7 @@ class SvmModel:
 
     def fit(self, train_path: Union[str, Path], show_progressbar = True, extension = 'flac') -> SvmModel:
         """
-        Train the model
+        Trains the model on all files in a directory.
         :param train_path: path to a directory containing training data
         :param show_progressbar: show a progressbar when processing input files
         :param extension: audio file extensions
@@ -55,7 +55,8 @@ class SvmModel:
 
     def predict(self, predict_path, merge_window = 10, cut_length = 2.2, show_progressbar = True, extension = 'flac'):
         """
-        Processes all audio files in the given directory to
+        Splits every audio files in the given directory into windows of specified length and predicts the occurenced of an
+        event on each of them.
         :param predict_path: path to a directory containg audio data
         :param merge_window: (in seconds) detections within this interval will be merged during postprocessing
         :param cut_length: (in seconds) detections shorter than this will be removed during postprocessing
@@ -80,7 +81,7 @@ class SvmModel:
     def evaluate(self, test_path, merge_window = 10, cut_length = 2.2, show_progressbar = True, extension = 'flac') -> \
     tuple[float, np.ndarray]:
         """
-        Evaluates performance of the model
+        Evaluates performance of the model on all files in a directory.
         :param test_path: path to a directory containg audio data
         :param merge_window: (in seconds) detections within this interval will be merged during postprocessing
         :param cut_length: (in seconds) detections shorter than this will be removed during postprocessing
@@ -108,6 +109,17 @@ class SvmModel:
     @staticmethod
     def from_file(path: Path | str, *, win_length = None, hop_length = None, window_type = None,
                   percentage_overlap = None) -> SvmModel:
+        """
+        Creates SvmModel from file. Parameters will be read from the file name. If they are not present or need to be
+        overriden, they can be passed as arguments to this method.
+        :param path: path to the saved model
+        :param win_length: analysis window length (in seconds)
+        :param hop_length: window hop length (in seconds)
+        :param window_type: type of windowing function to be used ('hamming', 'hann', 'boxcar')
+        :param percentage_overlap: Minimum percentage overlap of analysis window and input label that should be achieved
+        for an event to be detected
+        :return: constructed model
+        """
         pipeline, matched_win_length, matched_percentage_overlap, matched_window_type = load_model(path)
         if matched_win_length is None and win_length is None:
             raise ValueError('Could not find window length in filename and none was provided')
