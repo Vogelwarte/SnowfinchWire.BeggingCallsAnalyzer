@@ -5,12 +5,12 @@ from pathlib import Path
 import fire
 import pandas as pd
 
-from src.beggingcallsanalyzer.models.SvmModel import SvmModel
-from src.beggingcallsanalyzer.training.evaluation import evaluate_model
-from src.beggingcallsanalyzer.training.persistence import save_model
-from src.beggingcallsanalyzer.training.postprocessing import to_audacity_labels
-from src.beggingcallsanalyzer.training.train import clean_output_directory, load_and_prepare_data, fit_model
-from src.beggingcallsanalyzer.utilities.exceptions import ArgumentError
+from beggingcallsanalyzer.models.SvmModel import SvmModel
+from beggingcallsanalyzer.training.evaluation import evaluate_model
+from beggingcallsanalyzer.training.persistence import save_model
+from beggingcallsanalyzer.training.postprocessing import to_audacity_labels
+from beggingcallsanalyzer.training.train import clean_output_directory, load_and_prepare_data, fit_model
+from beggingcallsanalyzer.utilities.exceptions import ArgumentError
 
 
 @dataclass
@@ -37,7 +37,7 @@ class Cli:
         try:
             for filename, data in predictions.items():
                 labels = to_audacity_labels(data['predictions'], data['duration'], model.win_length, model.hop_length)
-                labels.to_csv(f'{filename.parent}/{filename.stem}.txt', header = None, index = None, sep = '\t')
+                labels.to_csv(f'{filename.parent}/predicted_{filename.stem}.txt', header = None, index = None, sep = '\t')
         except ArgumentError as e:
             print(e)
             print('Quitting...')
@@ -103,5 +103,5 @@ class Cli:
         save_model(model, output_path)
 
 
-if __name__ == '__main__':
+def run():
     fire.Fire(Cli)

@@ -2,7 +2,7 @@ import numpy as np
 from sklearn.metrics import balanced_accuracy_score, confusion_matrix
 from sklearn.pipeline import Pipeline
 
-from src.beggingcallsanalyzer.training.postprocessing import post_process
+from beggingcallsanalyzer.training.postprocessing import post_process
 
 
 def evaluate_model(model: Pipeline, x_test, y_true, win_length, hop_length, merge_window, cut_length) -> tuple[float, np.ndarray]:

@@ -64,7 +64,7 @@ class SvmModel:
         :param extension: audio file extensions
         :return: a dictionary containing predicted values for every window for every audio file in predict_path
         """
-        files = Path(predict_path).glob(f'**/*.{extension}')
+        files = list(Path(predict_path).glob(f'**/*.{extension}'))
         flac: Path
         results = {}
         for flac in tqdm(files, disable = not show_progressbar):

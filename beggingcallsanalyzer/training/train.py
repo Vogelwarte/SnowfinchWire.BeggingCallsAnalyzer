@@ -20,7 +20,7 @@ from ..utilities.exceptions import ArgumentError
 def fit_model(x_train: pd.DataFrame, y_train: Union[pd.DataFrame, pd.Series]) -> Pipeline:
     pipe = Pipeline([
         ('scaler', MinMaxScaler()),
-        ('svc', SVC(C = 20, cache_size = 2000))
+        ('svc', SVC(C = 20, cache_size = 2000, probability=True))
     ])
     pipe.fit(x_train, y_train)
     return pipe
