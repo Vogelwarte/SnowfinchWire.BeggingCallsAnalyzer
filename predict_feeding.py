@@ -19,6 +19,8 @@ if __name__ == '__main__':
 	data_path = Path(args.data_path)
 	brood_dirs = [path for path in data_path.rglob('*') if path.stem in brood_ids]
 
+	print(f'Starting processes for broods: {brood_dirs}')
+
 	processes = []
 	for brood_dir in brood_dirs:
 		cmd = [
@@ -26,6 +28,8 @@ if __name__ == '__main__':
 			args.model_path, brood_dir.as_posix(), '--extension', 'WAV'
 		]
 		processes.append(subprocess.Popen(cmd))
+
+	print(f'Started {len(processes)}')
 
 	for process in processes:
 		exit_code = process.wait()
