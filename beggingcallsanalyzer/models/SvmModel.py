@@ -68,14 +68,18 @@ class SvmModel:
         flac: Path
         results = {}
         for flac in tqdm(files, disable = not show_progressbar):
-            audio_data, sample_rate = sf.read(flac)
-            df = extract_features(audio_data, sample_rate, self.win_length, self.hop_length)
-            y_pred = self._pipeline.predict(df)
-            y_processed = post_process(y_pred, self.win_length, self.hop_length, merge_window, cut_length)
-            results[flac] = {
-                'duration': len(audio_data) / float(sample_rate),
-                'predictions': y_processed
-            }
+            try:
+                audio_data, sample_rate = sf.read(flac)
+                df = extract_features(audio_data, sample_rate, self.win_length, self.hop_length)
+                y_pred = self._pipeline.predict(df)
+                y_processed = post_process(y_pred, self.win_length, self.hop_length, merge_window, cut_length)
+                results[flac] = {
+                    'duration': len(audio_data) / float(sample_rate),
+                    'predictions': y_processed
+                }
+            except sf.LibsndfileError:
+                continue
+
         return results
 
     def evaluate(self, test_path, merge_window = 10, cut_length = 2.2, show_progressbar = True, extension = 'flac') -> \
