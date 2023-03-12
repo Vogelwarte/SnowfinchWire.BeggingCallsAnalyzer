@@ -26,22 +26,26 @@ class TrainingReport:
 
 class Cli:
     def predict(self, model_path, files_directory, merge_window = 10, cut_length = 2.2, win_length = None,
-                hop_length = None, window_type = None, overlap_percentage = None, extension = 'flac'):
+                hop_length = None, window_type = None, overlap_percentage = None, extension = 'flac',
+                batch_size = 100):
         model = SvmModel.from_file(model_path, win_length = win_length, hop_length = hop_length,
                                    window_type = window_type,
                                    percentage_overlap = overlap_percentage)
 
-        # try:
-        predictions = model.predict(files_directory, merge_window = merge_window, cut_length = cut_length,
-                                    extension = extension)
-        try:
-            for filename, data in predictions.items():
-                labels = to_audacity_labels(data['predictions'], data['duration'], model.win_length, model.hop_length)
-                labels.to_csv(f'{filename.parent}/predicted_{filename.stem}.txt', header = None, index = None, sep = '\t')
-        except ArgumentError as e:
-            print(e)
-            print('Quitting...')
-            return
+        recordings = list(Path(files_directory).rglob(f'*.{extension}'))
+        for i in range(0, len(recordings), batch_size):
+            to_idx = min(i + batch_size, len(recordings))
+            # try:
+            predictions = model.predict(recordings[i:to_idx], merge_window = merge_window, cut_length = cut_length)
+
+            try:
+                for filename, data in predictions.items():
+                    labels = to_audacity_labels(data['predictions'], data['duration'], model.win_length, model.hop_length)
+                    labels.to_csv(f'{filename.parent}/predicted_{filename.stem}.txt', header = None, index = None, sep = '\t')
+            except ArgumentError as e:
+                print(e)
+                print('Quitting...')
+                return
 
     def train_evaluate(self, path = None, show_progressbar = False, merge_window = 10, cut_length = 2.2,
                        output_path: str = '.out'):

@@ -53,27 +53,31 @@ class SvmModel:
         self._pipeline.fit(x_train, y_train)
         return self
 
-    def predict(self, predict_path, merge_window = 10, cut_length = 2.2, show_progressbar = True, extension = 'flac'):
+    def predict(
+            self, recordings: list[Path], merge_window = 10, cut_length = 2.2,
+            show_progressbar = True, extension = 'flac'
+    ):
         """
         Splits every audio files in the given directory into windows of specified length and predicts the occurenced of an
         event on each of them.
-        :param predict_path: path to a directory containg audio data
+        # :param predict_path: path to a directory containg audio data
+        :param recordings: paths to recordings for which predictions are to be made
         :param merge_window: (in seconds) detections within this interval will be merged during postprocessing
         :param cut_length: (in seconds) detections shorter than this will be removed during postprocessing
         :param show_progressbar:show a progress bar when processing input file
         :param extension: audio file extensions
         :return: a dictionary containing predicted values for every window for every audio file in predict_path
         """
-        files = list(Path(predict_path).glob(f'**/*.{extension}'))
-        flac: Path
+        # files = list(Path(predict_path).glob(f'**/*.{extension}'))
+        # flac: Path
         results = {}
-        for flac in tqdm(files, disable = not show_progressbar):
+        for rec in tqdm(recordings, disable = not show_progressbar):
             try:
-                audio_data, sample_rate = sf.read(flac)
+                audio_data, sample_rate = sf.read(rec)
                 df = extract_features(audio_data, sample_rate, self.win_length, self.hop_length)
                 y_pred = self._pipeline.predict(df)
                 y_processed = post_process(y_pred, self.win_length, self.hop_length, merge_window, cut_length)
-                results[flac] = {
+                results[rec] = {
                     'duration': len(audio_data) / float(sample_rate),
                     'predictions': y_processed
                 }
