@@ -81,7 +81,8 @@ class SvmModel:
                     'duration': len(audio_data) / float(sample_rate),
                     'predictions': y_processed
                 }
-            except sf.LibsndfileError:
+            except Exception as e:
+                print(f'Error: {e}')
                 continue
 
         return results

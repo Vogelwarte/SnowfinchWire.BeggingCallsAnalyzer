@@ -27,12 +27,19 @@ class TrainingReport:
 class Cli:
     def predict(self, model_path, files_directory, merge_window = 10, cut_length = 2.2, win_length = None,
                 hop_length = None, window_type = None, overlap_percentage = None, extension = 'flac',
-                batch_size = 100):
+                batch_size = 100, missing_only = False):
         model = SvmModel.from_file(model_path, win_length = win_length, hop_length = hop_length,
                                    window_type = window_type,
                                    percentage_overlap = overlap_percentage)
 
-        recordings = list(Path(files_directory).rglob(f'*.{extension}'))
+        if missing_only:
+            recordings = []
+            for rec in Path(files_directory).rglob(f'*.{extension}'):
+                if not Path(rec.parent.joinpath(f'predicted_{rec.stem}.txt')).exists():
+                    recordings.append(rec)
+        else:
+            recordings = list(Path(files_directory).rglob(f'*.{extension}'))
+
         for i in range(0, len(recordings), batch_size):
             to_idx = min(i + batch_size, len(recordings))
             # try:
