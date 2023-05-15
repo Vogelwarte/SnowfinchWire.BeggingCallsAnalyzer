@@ -1,45 +1,78 @@
-from dataclasses import dataclass
-from os import getenv
-from pathlib import Path
+import typer
+from typing import Literal
+from typing_extensions import Annotated
 
-import fire
-import pandas as pd
-
-from beggingcallsanalyzer.models.SvmModel import SvmModel
 from beggingcallsanalyzer.models.CnnModel import CnnModel
-from beggingcallsanalyzer.training.evaluation import evaluate_model
-from beggingcallsanalyzer.training.persistence import save_model
-from beggingcallsanalyzer.training.postprocessing import to_audacity_labels
-from beggingcallsanalyzer.training.train import clean_output_directory, load_and_prepare_data, fit_model
 from beggingcallsanalyzer.utilities.exceptions import ArgumentError
+from beggingcallsanalyzer.training.trainer import Trainer
+from rich.progress import Progress, SpinnerColumn, TextColumn
 
-class Cli:
-    def predict(self, model_path, files_directory, merge_window = 10, cut_length = 2.2, win_length = None,
-                hop_length = None, window_type = None, overlap_percentage = None, extension = 'flac', threshold=0.8):
-        model = CnnModel.from_file(model_path, win_length = win_length, hop_length = hop_length,
-                                   window_type = window_type,
-                                   percentage_overlap = overlap_percentage)
 
-        # try:
+app = typer.Typer()
+
+@app.command()
+def predict_oss(model_path: Annotated[str, typer.Option(help="")],
+            files_directory: Annotated[str, typer.Option(help="")],
+            merge_window: Annotated[float, typer.Option(help="")] = 10, 
+            cut_length: Annotated[float, typer.Option(help="")] = 2.2, 
+            win_length: Annotated[float, typer.Option(help="")] = None,
+            hop_length: Annotated[float, typer.Option(help="")] = None, 
+            window_type: Annotated[Literal['hann', 'hamming'], typer.Option(help="")] = None, 
+            overlap_percentage: Annotated[float, typer.Option(help="")] = None, 
+            extension: Annotated[str, typer.Option(help="")] = 'flac', 
+            threshold: Annotated[float, typer.Option(help="")]=0.8):
+    model = CnnModel.from_file(model_path, win_length = win_length, hop_length = hop_length,
+                                window_type = window_type,
+                                percentage_overlap = overlap_percentage)
+
+    with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), transient=True) as progress:
+        progress.add_task(description="Running prediction...", total=None)
         predictions = model.predict(files_directory, merge_window = merge_window, cut_length = cut_length,
-                                    extension = extension)
-        try:
-            for filename, data in predictions.items():
-                data['predictions'].to_csv(f'{filename.parent}/predicted_{filename.stem}.txt', header = None, index = None, sep = '\t')
-        except ArgumentError as e:
-            print(e)
-            print('Quitting...')
-            return
+                                    extension = extension, threshold=threshold)
+    print("Done!")
+    for filename, data in predictions.items():
+        data['predictions'].to_csv(f'{filename.parent}/predicted_{filename.stem}.txt', header = None, index = None, sep = '\t')
+    
+@app.command()
+def predict_fe(model_path: Annotated[str, typer.Option(help="")],
+            files_directory: Annotated[str, typer.Option(help="")],
+            merge_window: Annotated[float, typer.Option(help="")] = 10, 
+            cut_length: Annotated[float, typer.Option(help="")] = 2.2, 
+            win_length: Annotated[float, typer.Option(help="")] = None,
+            hop_length: Annotated[float, typer.Option(help="")] = None, 
+            window_type: Annotated[Literal['hann', 'hamming'], typer.Option(help="")] = None, 
+            overlap_percentage: Annotated[float, typer.Option(help="")] = None, 
+            extension: Annotated[str, typer.Option(help="")] = 'flac'):
+    trainer = Trainer()
+    try:
+        trainer.predict(model_path, files_directory, merge_window, cut_length, win_length, hop_length,
+                    window_type, overlap_percentage, extension)
+    except ArgumentError as e:
+        print(e)
 
-    def train_evaluate(self, path = None, show_progressbar = False, merge_window = 10, cut_length = 2.2,
-                       output_path: str = '.out'):
-        pass
 
+# @app.command()
+# def train_evaluate(path = None, show_progressbar = False, merge_window = 10, cut_length = 2.2,
+#                     output_path: str = '.out'):
+#     pass
 
-    def train(self, training_data_path, win_length, window_type, overlap_percentage, output_path: str = '.out',
-              show_progressbar = True):
-        pass
+@app.command()
+def train_oss(win_length, batch_size, num_workers, epochs, training_data_path, output_path: str = '.out'):
+    model = CnnModel(win_length, batch_size, num_workers, epochs)
+    model.fit(training_data_path)
+    model.save(output_path)
+    
 
+@app.command()
+def train_fe(training_data_path, win_length, window_type, overlap_percentage, output_path: str = '.out', show_progressbar = True):
+    trainer = Trainer()
+    try:
+        trainer.train(training_data_path, win_length, window_type, overlap_percentage, output_path, show_progressbar)
+    except ArgumentError as e:
+        print(e)
 
 def run():
-    fire.Fire(Cli)
+    app()
+
+if __name__ == "__main__":
+    app()

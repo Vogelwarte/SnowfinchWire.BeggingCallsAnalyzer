@@ -6,18 +6,15 @@ import warnings
 
 import numpy as np
 import pandas as pd
-import soundfile as sf
-from tqdm.autonotebook import tqdm
 from opensoundscape import CNN
 from opensoundscape.torch.models.cnn import load_model, use_resample_loss
 from opensoundscape.metrics import predict_multi_target_labels
 import seaborn as sns
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 
-from ..common.preprocessing.io import load_recording_data
-from ..training.evaluation import evaluate_model
 from ..training.postprocessing import post_process
-from ..training.preprocessing import extract_features, process_features_classes
+
 from typing import Literal
 
 
@@ -58,10 +55,10 @@ class CnnModel:
             batch_size=self.batch_size,
             num_workers=self.num_workers, 
         )
-
+        
         return self
 
-    def predict(self, predict_path, threshold=0.8, merge_window = 10, cut_length = 2.2, show_progressbar = True, extension = 'flac'):
+    def predict(self, predict_path, threshold=0.8, merge_window = 10, cut_length = 2.2, extension = 'flac'):
         """
         Splits every audio files in the given directory into windows of specified length and predicts the occurenced of an
         event on each of them.
@@ -87,18 +84,27 @@ class CnnModel:
             }
 
         df = pd.concat([v['predictions'] for v in results.values()], keys=results.keys(), names=['filename', 'idx']).drop(columns=['start_time', 'end_time'])
-        pattern = '(?P<BROOD_ID>.*)-BA[0-9]+_BS[0-9]+-.*_(?P<DATE>[0-9]{8})_(?P<TIME>[0-9]{6}).flac'
+        pattern = f'(.*)[\\/](?<brood_id>[^\\]+)[\\/](?:[^\\]+)[\\/](?<datetime>.*).{extension}' #'(?P<BROOD_ID>.*)-BA[0-9]+_BS[0-9]+-.*_(?P<DATE>[0-9]{8})_(?P<TIME>[0-9]{6}).flac'
         data = df.index.get_level_values(0).str.extract(pattern)
         data.index.name='idx'
         df = df.join(data)
         df = pd.get_dummies(df, columns=['class'])
-        df = df.groupby(['BROOD_ID', 'DATE', 'TIME']).sum().reset_index()
+        df['datetime'] = pd.to_datetime(df['datetime'], format='%Y%m%d_%H%M%S')
+        df = df.groupby(['brood_id', 'datetime']).sum().reset_index()
         export_df = df.copy()
-        for brood_id in df['BROOD_ID'].unique():
-            brood_df = df[df['BROOD_ID'] == brood_id].pivot(index='TIME', columns='DATE', values='class_feeding')
-            s = sns.heatmap(brood_df, square=True, annot=True, cmap="crest")
-            s.set_facecolor('red')
-            plt.savefig(f'{predict_path}/{brood_id}_summary.png')
+
+        df = df.set_index(['brood_id', 'datetime'])
+        df = df.unstack(level=[0]).resample('1h').first().stack(level=[1], dropna=False).swaplevel(1, 0).sort_index()
+        fig, ax = plt.subplots()
+        for date, new_df in df.groupby(level=0):
+            ax.plot(new_df.index.get_level_values(1), new_df['class_feeding'], label=date, marker='o')
+        ax.set_ylim(bottom=0)
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d %H:%M'))
+        plt.legend()
+        plt.xticks(rotation=30)
+        plt.ylabel("Number of feedings")
+        plt.xlabel("Date and time")
+        plt.savefig(f'{predict_path}/feeding_plot.png')
         export_df.to_csv(f'{predict_path}/summary.csv', index=None)
         return results
 
@@ -137,7 +143,9 @@ class CnnModel:
         model.win_length = oss_model.preprocessor.sample_duration
         return model
     
-    
+    def save(self, path):
+        self._model.save(path)
+
     def __group_classes(self, df: pd.DataFrame, class_name: Literal['contact', 'feeding'], contact_merge_window, contact_cut_length):
         df_export = df[class_name].to_frame()
         if class_name == 'contact':

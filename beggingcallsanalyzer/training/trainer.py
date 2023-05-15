@@ -78,14 +78,11 @@ class Trainer:
         # try:
         predictions = model.predict(files_directory, merge_window = merge_window, cut_length = cut_length,
                                     extension = extension)
-        try:
-            for filename, data in predictions.items():
-                labels = to_audacity_labels(data['predictions'], data['duration'], model.win_length, model.hop_length)
-                labels.to_csv(f'{filename.parent}/predicted_{filename.stem}.txt', header = None, index = None, sep = '\t')
-        except ArgumentError as e:
-            print(e)
-            print('Quitting...')
-            return
+
+        for filename, data in predictions.items():
+            labels = to_audacity_labels(data['predictions'], data['duration'], model.win_length, model.hop_length)
+            labels.to_csv(f'{filename.parent}/predicted_{filename.stem}.txt', header = None, index = None, sep = '\t')
+
 
     def train_evaluate(self, path = None, show_progressbar = False, merge_window = 10, cut_length = 2.2,
                        output_path: str = '.out'):
