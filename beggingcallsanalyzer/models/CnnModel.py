@@ -12,6 +12,7 @@ from opensoundscape.metrics import predict_multi_target_labels
 import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
+import os
 
 from ..training.postprocessing import post_process
 
@@ -58,7 +59,7 @@ class CnnModel:
         
         return self
 
-    def predict(self, predict_path, threshold=0.8, merge_window = 10, cut_length = 2.2, extension = 'flac'):
+    def predict(self, recordings, predict_path, threshold=0.8, merge_window = 10, cut_length = 2.2, extension = 'flac'):
         """
         Splits every audio files in the given directory into windows of specified length and predicts the occurenced of an
         event on each of them.
@@ -69,12 +70,13 @@ class CnnModel:
         :param extension: audio file extensions
         :return: a dictionary containing predicted values for every window for every audio file in predict_path
         """
-        files = list(Path(predict_path).glob(f'**/*.{extension}'))
-        model_results = self._model.predict(files, activation_layer='sigmoid')
+        num_workers = max(os.cpu_count() / 2, 20)
+        model_results = self._model.predict(recordings, activation_layer='sigmoid', batch_size=256, num_workers=num_workers)
         df = predict_multi_target_labels(model_results, threshold)
-        
+        df['contact'] = (df['contact'] ^ df['feeding']) & df['contact']
         results = {}
         for file, new_df in df.groupby(level=0):
+            
             feeding_df = self.__group_classes(new_df.droplevel(0), 'feeding', merge_window, cut_length)
             contact_df = self.__group_classes(new_df.droplevel(0), 'contact', merge_window, cut_length)
             file_results = pd.concat([feeding_df, contact_df]).sort_values('start_time')
@@ -84,28 +86,29 @@ class CnnModel:
             }
 
         df = pd.concat([v['predictions'] for v in results.values()], keys=results.keys(), names=['filename', 'idx']).drop(columns=['start_time', 'end_time'])
-        pattern = f'(.*)[\\/](?<brood_id>[^\\]+)[\\/](?:[^\\]+)[\\/](?<datetime>.*).{extension}' #'(?P<BROOD_ID>.*)-BA[0-9]+_BS[0-9]+-.*_(?P<DATE>[0-9]{8})_(?P<TIME>[0-9]{6}).flac'
+        pattern = f'(.*)[\\/](?P<brood_id>[^\\/]+)[\\/](?:[^\\/]+)[\\/](?P<datetime>.*)\.{extension}' #'(?P<BROOD_ID>.*)-BA[0-9]+_BS[0-9]+-.*_(?P<DATE>[0-9]{8})_(?P<TIME>[0-9]{6}).flac'
         data = df.index.get_level_values(0).str.extract(pattern)
         data.index.name='idx'
-        df = df.join(data)
+        df = df.reset_index().join(data)
         df = pd.get_dummies(df, columns=['class'])
         df['datetime'] = pd.to_datetime(df['datetime'], format='%Y%m%d_%H%M%S')
         df = df.groupby(['brood_id', 'datetime']).sum().reset_index()
-        export_df = df.copy()
-
-        df = df.set_index(['brood_id', 'datetime'])
-        df = df.unstack(level=[0]).resample('1h').first().stack(level=[1], dropna=False).swaplevel(1, 0).sort_index()
-        fig, ax = plt.subplots()
-        for date, new_df in df.groupby(level=0):
-            ax.plot(new_df.index.get_level_values(1), new_df['class_feeding'], label=date, marker='o')
-        ax.set_ylim(bottom=0)
-        ax.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d %H:%M'))
-        plt.legend()
-        plt.xticks(rotation=30)
-        plt.ylabel("Number of feedings")
-        plt.xlabel("Date and time")
-        plt.savefig(f'{predict_path}/feeding_plot.png')
-        export_df.to_csv(f'{predict_path}/summary.csv', index=None)
+        df = df.drop(columns=['filename', 'idx', 0])
+        summary_path = f'{predict_path}/summary.csv'
+        df.to_csv(summary_path, index=None, mode='a', header=not os.path.exists(summary_path))
+        # df = df.set_index(['brood_id', 'datetime'])
+        # df = df.unstack(level=[0]).resample('1h').first().stack(level=[1], dropna=False).swaplevel(1, 0).sort_index()
+        # fig, ax = plt.subplots()
+        # for date, new_df in df.groupby(level=0):
+        #     ax.plot(new_df.index.get_level_values(1), new_df['class_feeding'], label=date, marker='o')
+        # ax.set_ylim(bottom=0)
+        # ax.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d %H:%M'))
+        # plt.legend()
+        # plt.xticks(rotation=30)
+        # plt.ylabel("Number of feedings")
+        # plt.xlabel("Date and time")
+        # plt.savefig(f'{predict_path}/feeding_plot.png')
+        
         return results
 
     def evaluate(self, test_path, merge_window = 10, cut_length = 2.2, show_progressbar = True, extension = 'flac') -> \

@@ -6,6 +6,7 @@ from beggingcallsanalyzer.models.CnnModel import CnnModel
 from beggingcallsanalyzer.utilities.exceptions import ArgumentError
 from beggingcallsanalyzer.training.trainer import Trainer
 from rich.progress import Progress, SpinnerColumn, TextColumn
+from pathlib import Path
 
 
 app = typer.Typer()
@@ -17,21 +18,25 @@ def predict_oss(model_path: Annotated[str, typer.Option(help="")],
             cut_length: Annotated[float, typer.Option(help="")] = 2.2, 
             win_length: Annotated[float, typer.Option(help="")] = None,
             hop_length: Annotated[float, typer.Option(help="")] = None, 
-            window_type: Annotated[Literal['hann', 'hamming'], typer.Option(help="")] = None, 
+            window_type: Annotated[str, typer.Option(help="")] = None, 
             overlap_percentage: Annotated[float, typer.Option(help="")] = None, 
             extension: Annotated[str, typer.Option(help="")] = 'flac', 
-            threshold: Annotated[float, typer.Option(help="")]=0.8):
+            threshold: Annotated[float, typer.Option(help="")]=0.8,
+            batch_size = 100):
     model = CnnModel.from_file(model_path, win_length = win_length, hop_length = hop_length,
                                 window_type = window_type,
                                 percentage_overlap = overlap_percentage)
 
-    with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), transient=True) as progress:
-        progress.add_task(description="Running prediction...", total=None)
-        predictions = model.predict(files_directory, merge_window = merge_window, cut_length = cut_length,
-                                    extension = extension, threshold=threshold)
-    print("Done!")
-    for filename, data in predictions.items():
-        data['predictions'].to_csv(f'{filename.parent}/predicted_{filename.stem}.txt', header = None, index = None, sep = '\t')
+    #with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), transient=True) as progress:
+        #progress.add_task(description="Running prediction...", total=None)
+    recordings = list(Path(files_directory).rglob(f'*.{extension}'))
+    for i in range(0, recordings, batch_size):
+        to_idx = min(i + batch_size, len(recordings))
+        predictions = model.predict(recordings[i:to_idx], files_directory, merge_window = merge_window, cut_length = cut_length,
+                                        extension = extension, threshold=threshold)
+        
+        for filename, data in predictions.items():
+            data['predictions'].to_csv(f'{filename.parent}/predicted_oss_{filename.stem}.txt', header = None, index = None, sep = '\t')
     
 @app.command()
 def predict_fe(model_path: Annotated[str, typer.Option(help="")],
@@ -40,7 +45,7 @@ def predict_fe(model_path: Annotated[str, typer.Option(help="")],
             cut_length: Annotated[float, typer.Option(help="")] = 2.2, 
             win_length: Annotated[float, typer.Option(help="")] = None,
             hop_length: Annotated[float, typer.Option(help="")] = None, 
-            window_type: Annotated[Literal['hann', 'hamming'], typer.Option(help="")] = None, 
+            window_type: Annotated[str, typer.Option(help="")] = None, 
             overlap_percentage: Annotated[float, typer.Option(help="")] = None, 
             extension: Annotated[str, typer.Option(help="")] = 'flac'):
     trainer = Trainer()
