@@ -59,7 +59,7 @@ class CnnModel:
         
         return self
 
-    def predict(self, recordings, predict_path, threshold=0.8, merge_window = 10, cut_length = 2.2, extension = 'flac'):
+    def predict(self, recordings, predict_path, threshold=0.8, merge_window = 10, cut_length = 2.2, extension = 'flac', batch_size=256):
         """
         Splits every audio files in the given directory into windows of specified length and predicts the occurenced of an
         event on each of them.
@@ -70,8 +70,8 @@ class CnnModel:
         :param extension: audio file extensions
         :return: a dictionary containing predicted values for every window for every audio file in predict_path
         """
-        num_workers = max(os.cpu_count() / 2, 20)
-        model_results = self._model.predict(recordings, activation_layer='sigmoid', batch_size=256, num_workers=num_workers)
+        num_workers = int(min(os.cpu_count() / 2, 20))
+        model_results = self._model.predict(recordings, activation_layer='sigmoid', batch_size=batch_size, num_workers=num_workers)
         df = predict_multi_target_labels(model_results, threshold)
         df['contact'] = (df['contact'] ^ df['feeding']) & df['contact']
         results = {}
@@ -85,17 +85,19 @@ class CnnModel:
                 'predictions': file_results.reset_index(drop=True)
             }
 
-        df = pd.concat([v['predictions'] for v in results.values()], keys=results.keys(), names=['filename', 'idx']).drop(columns=['start_time', 'end_time'])
-        pattern = f'(.*)[\\/](?P<brood_id>[^\\/]+)[\\/](?:[^\\/]+)[\\/](?P<datetime>.*)\.{extension}' #'(?P<BROOD_ID>.*)-BA[0-9]+_BS[0-9]+-.*_(?P<DATE>[0-9]{8})_(?P<TIME>[0-9]{6}).flac'
-        data = df.index.get_level_values(0).str.extract(pattern)
-        data.index.name='idx'
-        df = df.reset_index().join(data)
-        df = pd.get_dummies(df, columns=['class'])
-        df['datetime'] = pd.to_datetime(df['datetime'], format='%Y%m%d_%H%M%S')
-        df = df.groupby(['brood_id', 'datetime']).sum().reset_index()
-        df = df.drop(columns=['filename', 'idx', 0])
-        summary_path = f'{predict_path}/summary.csv'
-        df.to_csv(summary_path, index=None, mode='a', header=not os.path.exists(summary_path))
+        # df = pd.concat([v['predictions'] for v in results.values()], keys=results.keys(), names=['filename', 'idx']).drop(columns=['start_time', 'end_time']).reset_index()
+        # df['filename'] = df['filename'].astype(str)
+        # pattern = f'(.*)[\\/](?P<brood_id>[^\\/]+)[\\/](?:[^\\/]+)[\\/](?P<datetime>.*)\.{extension}'
+        # data = df['filename'].str.extract(pattern)
+        # df = df.join(data)
+        # df = pd.get_dummies(df, columns=['class'])
+        # df['datetime'] = pd.to_datetime(df['datetime'], format='%Y%m%d_%H%M%S', errors='coerce')
+        # df = df.dropna(axis='index', subset=['datetime'])
+        # df = df.groupby(['brood_id', 'datetime']).sum().reset_index()
+        # df = df.drop(columns=['filename', 'idx', 0])
+        # summary_path = f'{predict_path}/summary.csv'
+        # df.to_csv(summary_path, index=None, mode='a', header=not os.path.exists(summary_path))
+
         # df = df.set_index(['brood_id', 'datetime'])
         # df = df.unstack(level=[0]).resample('1h').first().stack(level=[1], dropna=False).swaplevel(1, 0).sort_index()
         # fig, ax = plt.subplots()
