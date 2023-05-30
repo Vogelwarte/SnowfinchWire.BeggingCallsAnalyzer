@@ -40,7 +40,9 @@ def predict_oss(model_path: Annotated[str, typer.Option(help="")],
                                             extension = extension, threshold=threshold, batch_size=inference_batch_size)
             
             for filename, data in predictions.items():
-                data['predictions'].to_csv(f'{output_directory}/{filename.stem}.txt', header = None, index = None, sep = '\t')
+                output_path = Path(f'{output_directory}/{filename.parent.parent.name}/{filename.parent.name}/')
+                output_path.mkdir(parents=True, exist_ok=True)
+                data['predictions'].to_csv(output_path/f'{filename.stem}.txt', header = None, index = None, sep = '\t')
     
 @app.command()
 def predict_fe(model_path: Annotated[str, typer.Option(help="")],
