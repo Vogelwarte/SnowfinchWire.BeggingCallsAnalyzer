@@ -8,6 +8,8 @@ from beggingcallsanalyzer.training.trainer import Trainer
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from pathlib import Path
 import warnings
+from beggingcallsanalyzer.plotting.summary import create_summary_csv
+from beggingcallsanalyzer.plotting.plotting import plot_feeding_count_daily, plot_feeding_duration_daily, plot_feeding_duration_hourly, plot_feeding_count_hourly
 
 
 app = typer.Typer()
@@ -31,7 +33,8 @@ def predict_oss(model_path: Annotated[str, typer.Option(help="")],
                                 percentage_overlap = overlap_percentage)
     warnings.filterwarnings('ignore', ".*keyword argument 'filename' has been renamed to 'path'.*")
     with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), transient=True) as progress:
-        Path(output_directory).mkdir(parents=True, exist_ok=True)
+        output_directory: Path = Path(output_directory)
+        output_directory.mkdir(parents=True, exist_ok=True)
         progress.add_task(description="Running prediction...", total=None)
         recordings = list(Path(input_directory).rglob(f'*.{extension}'))
         for i in range(0, len(recordings), processing_batch_size):
@@ -39,6 +42,13 @@ def predict_oss(model_path: Annotated[str, typer.Option(help="")],
             predictions = model.predict(recordings[i:to_idx], input_directory, merge_window = merge_window, cut_length = cut_length,
                                             extension = extension, threshold=threshold, batch_size=inference_batch_size)
             
+            summary = create_summary_csv(predictions, output_directory, extension)
+
+            plot_feeding_count_hourly(summary, output_directory)
+            plot_feeding_duration_hourly(summary, output_directory)
+            plot_feeding_count_daily(summary, output_directory)
+            plot_feeding_count_daily(summary, output_directory)
+
             for filename, data in predictions.items():
                 output_path = Path(f'{output_directory}/{filename.parent.parent.name}/{filename.parent.name}/')
                 output_path.mkdir(parents=True, exist_ok=True)

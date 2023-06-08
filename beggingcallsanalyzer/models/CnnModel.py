@@ -9,9 +9,6 @@ import pandas as pd
 from opensoundscape import CNN
 from opensoundscape.torch.models.cnn import load_model, use_resample_loss
 from opensoundscape.metrics import predict_multi_target_labels
-import seaborn as sns
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
 import os
 
 from ..training.postprocessing import post_process
@@ -84,32 +81,6 @@ class CnnModel:
                 'duration': new_df.reset_index().iloc[-1]['end_time'],
                 'predictions': file_results.reset_index(drop=True)
             }
-
-        # df = pd.concat([v['predictions'] for v in results.values()], keys=results.keys(), names=['filename', 'idx']).drop(columns=['start_time', 'end_time']).reset_index()
-        # df['filename'] = df['filename'].astype(str)
-        # pattern = f'(.*)[\\/](?P<brood_id>[^\\/]+)[\\/](?:[^\\/]+)[\\/](?P<datetime>.*)\.{extension}'
-        # data = df['filename'].str.extract(pattern)
-        # df = df.join(data)
-        # df = pd.get_dummies(df, columns=['class'])
-        # df['datetime'] = pd.to_datetime(df['datetime'], format='%Y%m%d_%H%M%S', errors='coerce')
-        # df = df.dropna(axis='index', subset=['datetime'])
-        # df = df.groupby(['brood_id', 'datetime']).sum().reset_index()
-        # df = df.drop(columns=['filename', 'idx', 0])
-        # summary_path = f'{predict_path}/summary.csv'
-        # df.to_csv(summary_path, index=None, mode='a', header=not os.path.exists(summary_path))
-
-        # df = df.set_index(['brood_id', 'datetime'])
-        # df = df.unstack(level=[0]).resample('1h').first().stack(level=[1], dropna=False).swaplevel(1, 0).sort_index()
-        # fig, ax = plt.subplots()
-        # for date, new_df in df.groupby(level=0):
-        #     ax.plot(new_df.index.get_level_values(1), new_df['class_feeding'], label=date, marker='o')
-        # ax.set_ylim(bottom=0)
-        # ax.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d %H:%M'))
-        # plt.legend()
-        # plt.xticks(rotation=30)
-        # plt.ylabel("Number of feedings")
-        # plt.xlabel("Date and time")
-        # plt.savefig(f'{predict_path}/feeding_plot.png')
         
         return results
 
