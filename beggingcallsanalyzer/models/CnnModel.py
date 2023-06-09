@@ -1,19 +1,17 @@
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Union
+import os
 import warnings
+from pathlib import Path
+from typing import Literal, Union
 
 import numpy as np
 import pandas as pd
 from opensoundscape import CNN
-from opensoundscape.torch.models.cnn import load_model, use_resample_loss
 from opensoundscape.metrics import predict_multi_target_labels
-import os
+from opensoundscape.torch.models.cnn import load_model, use_resample_loss
 
-from ..training.postprocessing import post_process
-
-from typing import Literal
+from beggingcallsanalyzer.training.postprocessing import post_process
 
 
 class CnnModel:
@@ -56,7 +54,8 @@ class CnnModel:
         
         return self
 
-    def predict(self, recordings, predict_path, threshold=0.8, merge_window = 10, cut_length = 2.2, extension = 'flac', batch_size=256):
+    def predict(self, recordings: pd.DataFrame, threshold=0.85, merge_window = 10, cut_length = 2.2, contact_merge_window = 10, contact_cut_length = 3, 
+                batch_size=256, contact_threshold=0.887):
         """
         Splits every audio files in the given directory into windows of specified length and predicts the occurenced of an
         event on each of them.
@@ -69,13 +68,12 @@ class CnnModel:
         """
         num_workers = int(min(os.cpu_count() / 2, 20))
         model_results = self._model.predict(recordings, activation_layer='sigmoid', batch_size=batch_size, num_workers=num_workers)
-        df = predict_multi_target_labels(model_results, threshold)
+        df = predict_multi_target_labels(model_results, [threshold, contact_threshold, 1])
         df['contact'] = (df['contact'] ^ df['feeding']) & df['contact']
         results = {}
         for file, new_df in df.groupby(level=0):
-            
             feeding_df = self.__group_classes(new_df.droplevel(0), 'feeding', merge_window, cut_length)
-            contact_df = self.__group_classes(new_df.droplevel(0), 'contact', merge_window, cut_length)
+            contact_df = self.__group_classes(new_df.droplevel(0), 'contact', contact_merge_window, contact_cut_length)
             file_results = pd.concat([feeding_df, contact_df]).sort_values('start_time')
             results[file] = {
                 'duration': new_df.reset_index().iloc[-1]['end_time'],
@@ -84,23 +82,8 @@ class CnnModel:
         
         return results
 
-    def evaluate(self, test_path, merge_window = 10, cut_length = 2.2, show_progressbar = True, extension = 'flac') -> \
-    tuple[float, np.ndarray]:
-        """
-        Evaluates performance of the model on all files in a directory.
-        :param test_path: path to a directory containg audio data
-        :param merge_window: (in seconds) detections within this interval will be merged during postprocessing
-        :param cut_length: (in seconds) detections shorter than this will be removed during postprocessing
-        :param show_progressbar:show a progress bar when processing input file
-        :param extension: audio file extensions
-        :return: a tuple containing accuracy and confusion matrix
-        """
-        raise NotImplementedError()
-
-
     @staticmethod
-    def from_file(path: Path | str, *, win_length = None, hop_length = None, window_type = None,
-                  percentage_overlap = None) -> CnnModel:
+    def from_file(path: Path | str) -> CnnModel:
         """
         Creates SvmModel from file. Parameters will be read from the file name. If they are not present or need to be
         overriden, they can be passed as arguments to this method.

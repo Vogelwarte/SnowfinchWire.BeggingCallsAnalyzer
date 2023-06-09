@@ -3,6 +3,7 @@ from more_itertools import chunked
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from pathlib import Path
+import numpy as np
 
 
 def plot_feeding_count_daily(df, output_dir):
@@ -19,7 +20,10 @@ def plot_feeding_count_daily(df, output_dir):
         broods = []
         for brood, new_df in batch:
             broods.append(brood)
-            ax.plot(new_df.index.get_level_values(1), new_df['feeding_count'], label=brood, marker='o')
+            mask = np.isfinite(new_df['feeding_count'])
+            line, = ax.plot(new_df.index.get_level_values(1)[mask], new_df['feeding_count'][mask], ls='--')
+            marker = 'v' if "Furka" in brood else "o"
+            ax.plot(new_df.index.get_level_values(1), new_df['feeding_count'], label=brood, marker=marker, color=line.get_color())
         ax.set_ylim(bottom=0)
         ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
         plt.legend()
@@ -68,7 +72,10 @@ def plot_feeding_duration_daily(df, output_dir):
         broods = []
         for brood, new_df in batch:
             broods.append(brood)
-            ax.plot(new_df.index.get_level_values(1), new_df['mean_feeding_duration'], label=brood, marker='o')
+            mask = np.isfinite(new_df['mean_feeding_duration'])
+            line, = ax.plot(new_df.index.get_level_values(1)[mask], new_df['mean_feeding_duration'][mask], ls='--')
+            marker = 'v' if "Furka" in brood else "o"
+            ax.plot(new_df.index.get_level_values(1), new_df['mean_feeding_duration'], label=brood, marker=marker, color=line.get_color())
         ax.set_ylim(bottom=0)
         ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
         plt.legend()

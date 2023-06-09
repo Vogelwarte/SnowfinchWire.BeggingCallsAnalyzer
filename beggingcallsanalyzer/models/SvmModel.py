@@ -6,6 +6,7 @@ from typing import Union
 import numpy as np
 import pandas as pd
 import soundfile as sf
+from rich.progress import track
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.svm import SVC
@@ -40,7 +41,7 @@ class SvmModel:
         files = Path(train_path).glob(f'**/*.{extension}')
         data = []
 
-        for recording in tqdm(files, disable = not show_progressbar):
+        for recording in track(files, disable = not show_progressbar):
             file = load_recording_data(recording)
             duration = len(file.audio_data) / float(file.audio_sample_rate)
             df = extract_features(file.audio_data, file.audio_sample_rate, self.win_length, self.hop_length,
@@ -53,7 +54,7 @@ class SvmModel:
         self._pipeline.fit(x_train, y_train)
         return self
 
-    def predict(self, predict_path, merge_window = 10, cut_length = 2.2, show_progressbar = True, extension = 'flac'):
+    def predict(self, input_files, merge_window = 3, cut_length = 2.2, show_progressbar = True):
         """
         Splits every audio files in the given directory into windows of specified length and predicts the occurenced of an
         event on each of them.
@@ -64,12 +65,12 @@ class SvmModel:
         :param extension: audio file extensions
         :return: a dictionary containing predicted values for every window for every audio file in predict_path
         """
-        files = list(Path(predict_path).glob(f'**/*.{extension}'))
+        
         flac: Path
         results = {}
-        for flac in tqdm(files, disable = not show_progressbar):
+        for flac in track(input_files, disable = not show_progressbar):
             audio_data, sample_rate = sf.read(flac)
-            df = extract_features(audio_data, sample_rate, self.win_length, self.hop_length)
+            df = extract_features(audio_data, sample_rate, self.win_length, self.hop_length, window_type=self.window_type)
             y_pred = self._pipeline.predict(df)
             y_processed = post_process(y_pred, self.win_length, self.hop_length, merge_window, cut_length)
             results[flac] = {

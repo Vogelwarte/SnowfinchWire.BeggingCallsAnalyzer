@@ -1,31 +1,28 @@
 from dataclasses import dataclass
 from os import getenv
 from pathlib import Path
-import pandas as pd
+from shutil import rmtree
+from typing import Union
 
+import pandas as pd
+import rich.progress
+from more_itertools import chunked
+from rich.progress import track
+from sklearn.model_selection import train_test_split
+from beggingcallsanalyzer.plotting.plotting import (
+    plot_feeding_count_daily, plot_feeding_count_hourly,
+    plot_feeding_duration_daily, plot_feeding_duration_hourly)
+
+from beggingcallsanalyzer.common.preprocessing.io import load_recording_data
 from beggingcallsanalyzer.models.SvmModel import SvmModel
+from beggingcallsanalyzer.plotting.summary import create_summary_csv
 from beggingcallsanalyzer.training.evaluation import evaluate_model
 from beggingcallsanalyzer.training.persistence import save_model
 from beggingcallsanalyzer.training.postprocessing import to_audacity_labels
+from beggingcallsanalyzer.training.preprocessing import (
+    extract_features, process_features_classes)
 from beggingcallsanalyzer.utilities.exceptions import ArgumentError
 
-from pathlib import Path
-from shutil import rmtree
-
-import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.svm import SVC
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import MinMaxScaler
-from tqdm import tqdm
-
-from .preprocessing import extract_features, process_features_classes
-from ..common.preprocessing.io import load_recording_data
-
-
-from typing import Union
-
-from ..utilities.exceptions import ArgumentError
 
 @dataclass
 class TrainingReport:
@@ -47,42 +44,55 @@ class Trainer:
 
         train_paths, test_paths = train_test_split(files, test_size = test_size, random_state = 2)
         data = []
-        with tqdm(total = len(files), disable=not show_progressbar) as pbar:
+        with rich.progress.Progress(total = len(files), disable=not show_progressbar) as progress:
+            task1 = progress.add_task("Processing training files...", total=len(train_paths))
             for recording in train_paths:
                 file = load_recording_data(recording)
                 duration = len(file.audio_data) / float(file.audio_sample_rate)
                 df = extract_features(file.audio_data, file.audio_sample_rate, window, step, window_type)
                 df = process_features_classes(df, file.labels, percentage_overlap, duration, window, step)
                 data.append(df)
-                pbar.update()
+                progress.update(task1)
             train = pd.concat(data, ignore_index = True)
 
             data.clear()
+            task2 = progress.add_task("Processing test files...", total=len(test_paths))
             for recording in test_paths:
                 file = load_recording_data(recording)
                 duration = len(file.audio_data) / float(file.audio_sample_rate)
                 df = extract_features(file.audio_data, file.audio_sample_rate, window, step, window_type)
                 df = process_features_classes(df, file.labels, percentage_overlap, duration, window, step)
                 data.append(df)
-                pbar.update()
+                progress.update(task2)
             test = pd.concat(data, ignore_index = True)
 
         return train.drop(columns = ['y']), train['y'], test.drop(columns = ['y']), test['y']
 
-    def predict(self, model_path, files_directory, output_directory, merge_window = 10, cut_length = 2.2, win_length = None,
-                hop_length = None, window_type = None, overlap_percentage = None, extension = 'flac'):
+    def predict(self, model_path, input_directory, output_directory, merge_window = 3, cut_length = 2.2, win_length = None,
+                hop_length = None, window_type = None, overlap_percentage = None, extension = 'flac', processing_batch_size=100, create_plots=True):
         model = SvmModel.from_file(model_path, win_length = win_length, hop_length = hop_length,
                                    window_type = window_type,
                                    percentage_overlap = overlap_percentage)
-
-        # try:
-        predictions = model.predict(files_directory, merge_window = merge_window, cut_length = cut_length,
-                                    extension = extension)
         
-        Path(output_directory).mkdir(parents=True, exist_ok=True)
-        for filename, data in predictions.items():
-            labels = to_audacity_labels(data['predictions'], data['duration'], model.win_length, model.hop_length)
-            labels.to_csv(f'{output_directory}/{filename.stem}.txt', header = None, index = None, sep = '\t')
+        recordings = list(Path(input_directory).rglob(f'*.{extension}'))
+        df_summary = pd.DataFrame()
+        for recordings_chunk in chunked(recordings, processing_batch_size):
+            predictions = model.predict(recordings_chunk, merge_window = merge_window, cut_length = cut_length)
+            
+            #summary = create_summary_csv(predictions, output_directory, extension)
+            #df_summary = pd.concat([df_summary, summary])
+            Path(output_directory).mkdir(parents=True, exist_ok=True)
+            for filename, data in predictions.items():
+                output_path = Path(f'{output_directory}/{filename.parent.parent.name}/{filename.parent.name}/')
+                output_path.mkdir(parents=True, exist_ok=True)
+                labels = to_audacity_labels(data['predictions'], data['duration'], model.win_length, model.hop_length)
+                labels.to_csv(output_path/f'{filename.stem}.txt', header = None, index = None, sep = '\t')
+
+        if create_plots:
+            plot_feeding_count_hourly(df_summary, output_directory)
+            plot_feeding_duration_hourly(df_summary, output_directory)
+            plot_feeding_count_daily(df_summary, output_directory)
+            plot_feeding_duration_daily(df_summary, output_directory)
 
 
     def train_evaluate(self, path = None, show_progressbar = False, merge_window = 10, cut_length = 2.2,
@@ -144,14 +154,6 @@ class Trainer:
 
         save_model(model, output_path)
 
-
-    def fit_model(x_train: pd.DataFrame, y_train: Union[pd.DataFrame, pd.Series]) -> Pipeline:
-        pipe = Pipeline([
-            ('scaler', MinMaxScaler()),
-            ('svc', SVC(C = 20, cache_size = 2000, probability=True))
-        ])
-        pipe.fit(x_train, y_train)
-        return pipe
 
     def clean_output_directory(path: Path):
         for path in path.glob("**/*"):
