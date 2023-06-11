@@ -1,0 +1,13 @@
+model_path: ...
+input_directory: ...
+output_directory: ...
+merge_window: 3
+cut_length: 2
+contact_merge_window: 10
+contact_cut_length: 2
+extension: flac
+threshold: 0.85
+contact_threshold: 0.887
+processing_batch_size: 100
+inference_batch_size: 100
+create_plots: true

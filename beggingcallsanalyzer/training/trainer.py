@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from os import getenv
+import os
 from pathlib import Path
 from shutil import rmtree
 from typing import Union
@@ -18,7 +19,6 @@ from beggingcallsanalyzer.models.SvmModel import SvmModel
 from beggingcallsanalyzer.plotting.summary import create_summary_csv
 from beggingcallsanalyzer.training.evaluation import evaluate_model
 from beggingcallsanalyzer.training.persistence import save_model
-from beggingcallsanalyzer.training.postprocessing import to_audacity_labels
 from beggingcallsanalyzer.training.preprocessing import (
     extract_features, process_features_classes)
 from beggingcallsanalyzer.utilities.exceptions import ArgumentError
@@ -69,26 +69,36 @@ class Trainer:
         return train.drop(columns = ['y']), train['y'], test.drop(columns = ['y']), test['y']
 
     def predict(self, model_path, input_directory, output_directory, merge_window = 3, cut_length = 2.2, win_length = None,
-                hop_length = None, window_type = None, overlap_percentage = None, extension = 'flac', processing_batch_size=100, create_plots=True):
+                hop_length = None, window_type = None, extension = 'flac', processing_batch_size=100, create_plots=True):
         model = SvmModel.from_file(model_path, win_length = win_length, hop_length = hop_length,
-                                   window_type = window_type,
-                                   percentage_overlap = overlap_percentage)
-        
-        recordings = list(Path(input_directory).rglob(f'*.{extension}'))
+                                   window_type = window_type)
+        input_directory_path = Path(input_directory)
+        recordings = list(input_directory_path.rglob(f'*.{extension}'))
         df_summary = pd.DataFrame()
+        output_directory_path = Path(output_directory)
+        output_directory_path.mkdir(parents=True, exist_ok=True)
+        incorrect_folder_structure = False
         for recordings_chunk in chunked(recordings, processing_batch_size):
             predictions = model.predict(recordings_chunk, merge_window = merge_window, cut_length = cut_length)
             
-            #summary = create_summary_csv(predictions, output_directory, extension)
-            #df_summary = pd.concat([df_summary, summary])
-            Path(output_directory).mkdir(parents=True, exist_ok=True)
-            for filename, data in predictions.items():
-                output_path = Path(f'{output_directory}/{filename.parent.parent.name}/{filename.parent.name}/')
-                output_path.mkdir(parents=True, exist_ok=True)
-                labels = to_audacity_labels(data['predictions'], data['duration'], model.win_length, model.hop_length)
-                labels.to_csv(output_path/f'{filename.stem}.txt', header = None, index = None, sep = '\t')
+            if not incorrect_folder_structure and (bad_files := [f.name for f in filter(lambda k: k.parent.parent.parent != input_directory_path, predictions.keys())]):
+                print(f'Files {", ".join(bad_files)} are in an unexpected place in the directory structure. All predictions will be places in the root of the output directory, summary and plots will not be generated')
+                incorrect_folder_structure = True
+                output_path = output_directory_path
 
-        if create_plots:
+            if not incorrect_folder_structure:
+                summary = create_summary_csv(predictions, output_directory, extension)
+                df_summary = pd.concat([df_summary, summary])
+            
+            for filename, data in predictions.items():
+                if not incorrect_folder_structure:
+                    output_path = Path(f'{output_directory}/{filename.parent.parent.name}/{filename.parent.name}/')
+                output_path.mkdir(parents=True, exist_ok=True)
+                data['predictions'].to_csv(output_path/f'{filename.stem}.txt', header = None, index = None, sep = '\t')
+
+        if create_plots and not incorrect_folder_structure:
+            summary_path = f'{output_directory}/summary.csv'
+            df_summary.to_csv(summary_path, index=None, header=not os.path.exists(summary_path))
             plot_feeding_count_hourly(df_summary, output_directory)
             plot_feeding_duration_hourly(df_summary, output_directory)
             plot_feeding_count_daily(df_summary, output_directory)

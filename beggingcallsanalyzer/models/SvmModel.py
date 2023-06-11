@@ -12,11 +12,12 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.svm import SVC
 from tqdm.autonotebook import tqdm
 
-from ..common.preprocessing.io import load_recording_data
-from ..training.evaluation import evaluate_model
-from ..training.persistence import load_model
-from ..training.postprocessing import post_process
-from ..training.preprocessing import extract_features, process_features_classes
+from beggingcallsanalyzer.common.preprocessing.io import load_recording_data
+from beggingcallsanalyzer.training.evaluation import evaluate_model
+from beggingcallsanalyzer.training.persistence import load_model
+from beggingcallsanalyzer.training.postprocessing import post_process
+from beggingcallsanalyzer.training.preprocessing import extract_features, process_features_classes
+from beggingcallsanalyzer.training.postprocessing import to_audacity_labels
 
 
 class SvmModel:
@@ -75,7 +76,7 @@ class SvmModel:
             y_processed = post_process(y_pred, self.win_length, self.hop_length, merge_window, cut_length)
             results[flac] = {
                 'duration': len(audio_data) / float(sample_rate),
-                'predictions': y_processed
+                'predictions': to_audacity_labels(y_processed, len(audio_data) / float(sample_rate), self.win_length, self.hop_length) 
             }
         return results
 
@@ -108,8 +109,7 @@ class SvmModel:
         return accuracy, cm
 
     @staticmethod
-    def from_file(path: Path | str, *, win_length = None, hop_length = None, window_type = None,
-                  percentage_overlap = None) -> SvmModel:
+    def from_file(path: Path | str, *, win_length = None, hop_length = None, window_type = None) -> SvmModel:
         """
         Creates SvmModel from file. Parameters will be read from the file name. If they are not present or need to be
         overriden, they can be passed as arguments to this method.
@@ -124,8 +124,6 @@ class SvmModel:
         pipeline, matched_win_length, matched_percentage_overlap, matched_window_type = load_model(path)
         if matched_win_length is None and win_length is None:
             raise ValueError('Could not find window length in filename and none was provided')
-        if matched_percentage_overlap is None and percentage_overlap is None:
-            raise ValueError('Could not find overlap percentage in filename and none was provided')
         if matched_window_type is None and window_type is None:
             raise ValueError('Could not find window type in filename and none was provided')
 
@@ -133,7 +131,7 @@ class SvmModel:
             win_length = matched_win_length if win_length is None else win_length,
             hop_length = matched_win_length if hop_length is None else hop_length,
             window_type = matched_window_type if window_type is None else window_type,
-            percentage_overlap = matched_percentage_overlap if percentage_overlap is None else percentage_overlap)
+            percentage_overlap = None)
 
         model._pipeline = pipeline
         return model

@@ -1,0 +1,12 @@
+model_path: ...
+input_directory: ...
+output_directory: ...
+merge_window: 10
+cut_length: 2.2 
+win_length: null
+hop_length: null
+window_type: null
+overlap_percentage: null
+extension: flac
+processing_batch_size: 100
+create_plots: true

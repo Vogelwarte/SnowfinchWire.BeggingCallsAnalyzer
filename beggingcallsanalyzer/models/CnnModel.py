@@ -77,7 +77,7 @@ class CnnModel:
             file_results = pd.concat([feeding_df, contact_df]).sort_values('start_time')
             results[file] = {
                 'duration': new_df.reset_index().iloc[-1]['end_time'],
-                'predictions': file_results.reset_index(drop=True)
+                'predictions': file_results.reset_index(drop=True).rename(columns={'start_time': 'start', 'end_time': 'end'})
             }
         
         return results
@@ -109,6 +109,7 @@ class CnnModel:
         df_export = df[class_name].to_frame()
         if class_name == 'contact':
             df_export[class_name] = post_process(df_export.to_numpy().flatten(), self.win_length, self.win_length, contact_merge_window, contact_cut_length)
+            df_export[class_name] = (df_export[class_name] ^ df['feeding']) & df_export[class_name]
         df_export = df_export[df_export[class_name]==1]
         df_export = df_export.reset_index()
         df_export = df_export.rename(columns={class_name: 'class'})
