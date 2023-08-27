@@ -5,7 +5,7 @@ import os
 def create_summary_csv(results: dict, output_path, extension):
     df = pd.concat([v['predictions'] for v in results.values()], keys=results.keys(), names=['filename', 'idx']).reset_index()
     df['filename'] = df['filename'].astype(str)
-    pattern = f'(.*)[\\/](?P<brood_id>[^\\/]+)[\\/](?:[^\\/]+)[\\/](?P<datetime>.*)\.{extension}'
+    pattern = rf'(.*)[\\/](?P<brood_id>[^\\/]+)[\\/](?:[^\\/]+)[\\/](?P<datetime>.*)\.{extension}'
     data = df['filename'].str.extract(pattern)
     df = df.join(data)
     df = pd.get_dummies(df, columns=['class'])

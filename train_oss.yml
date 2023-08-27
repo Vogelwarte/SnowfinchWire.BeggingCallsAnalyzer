@@ -1,0 +1,6 @@
+win_length: 0.6
+hop_length: 0.6
+window_type: hamming
+overlap_percentage: 0.7
+training_data_path: ...
+output_path: ...

@@ -1,0 +1,6 @@
+win_length: 3
+batch_size: 100
+num_workers: 8
+epochs: 5
+training_data_path: ...
+output_path: ...

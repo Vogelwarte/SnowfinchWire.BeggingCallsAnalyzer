@@ -7,9 +7,9 @@ import pandas as pd
 from more_itertools import chunked
 
 
-def plot_feeding_count_daily(df, output_dir):
+def plot_feeding_count_daily(df: pd.DataFrame, output_dir):
     df['datetime'] = pd.to_datetime(df['datetime'])
-    df = df.groupby([df['datetime'].dt.date, 'brood_id']).mean().drop(columns=['datetime']).reset_index()
+    df = df.groupby([df['datetime'].dt.date, 'brood_id']).mean(numeric_only=True).reset_index()
     df['datetime'] = pd.to_datetime(df['datetime'])
     df = df.set_index(['brood_id', 'datetime'])
     df = df.unstack(level=[0]).resample('1d').first().stack(level=[1], dropna=False).swaplevel(1, 0).sort_index()
@@ -38,11 +38,11 @@ def plot_feeding_count_daily(df, output_dir):
         plt.savefig(output_path / f"{'-'.join(broods)}.png")
 
 
-def plot_feeding_count_hourly(df, output_dir):
+def plot_feeding_count_hourly(df: pd.DataFrame, output_dir):
     df['datetime'] = pd.to_datetime(df['datetime'])
     df = df.set_index(['brood_id', 'datetime'])
     df = df.unstack(level=[0]).resample('1h').first().stack(level=[1], dropna=False).swaplevel(1, 0).sort_index().reset_index()
-    result = df.groupby([df['datetime'].dt.hour, 'brood_id']).mean().swaplevel(1, 0).sort_index()
+    result = df.groupby([df['datetime'].dt.hour, 'brood_id']).mean(numeric_only=True).swaplevel(1, 0).sort_index()
     
     output_path = Path(output_dir) / "hourly_feeding_count"
     output_path.mkdir(parents=True, exist_ok=True)
@@ -63,7 +63,7 @@ def plot_feeding_count_hourly(df, output_dir):
         plt.savefig(output_path / f"{'-'.join(broods)}.png")
 
 
-def plot_feeding_duration_daily(df, output_dir):
+def plot_feeding_duration_daily(df: pd.DataFrame, output_dir):
     df['datetime'] = pd.to_datetime(df['datetime'])
     df['total_feeding_time'] = df['mean_feeding_duration'] * df['feeding_count']
     groups = df.groupby([df['datetime'].dt.date, 'brood_id'])
@@ -97,7 +97,7 @@ def plot_feeding_duration_daily(df, output_dir):
         plt.savefig(output_path / f"{'-'.join(broods)}.png")
 
 
-def plot_feeding_duration_hourly(df, output_dir):
+def plot_feeding_duration_hourly(df: pd.DataFrame, output_dir):
     df['datetime'] = pd.to_datetime(df['datetime'])
     df = df.set_index(['brood_id', 'datetime'])
     df['total_feeding_time'] = df['mean_feeding_duration'] * df['feeding_count']

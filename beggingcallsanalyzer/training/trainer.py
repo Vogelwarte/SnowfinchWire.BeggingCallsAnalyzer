@@ -3,12 +3,10 @@ from os import getenv
 import os
 from pathlib import Path
 from shutil import rmtree
-from typing import Union
 
 import pandas as pd
 import rich.progress
 from more_itertools import chunked
-from rich.progress import track
 from sklearn.model_selection import train_test_split
 from beggingcallsanalyzer.plotting.plotting import (
     plot_feeding_count_daily, plot_feeding_count_hourly,
@@ -99,11 +97,13 @@ class Trainer:
         if create_plots and not incorrect_folder_structure:
             summary_path = f'{output_directory}/summary.csv'
             df_summary.to_csv(summary_path, index=None, header=not os.path.exists(summary_path))
-            plot_feeding_count_hourly(df_summary, output_directory)
-            plot_feeding_duration_hourly(df_summary, output_directory)
-            plot_feeding_count_daily(df_summary, output_directory)
-            plot_feeding_duration_daily(df_summary, output_directory)
-
+            try:                
+                plot_feeding_count_hourly(df_summary, output_directory)
+                plot_feeding_duration_hourly(df_summary, output_directory)
+                plot_feeding_count_daily(df_summary, output_directory)
+                plot_feeding_duration_daily(df_summary, output_directory)
+            except:
+                print("Could not create some of the plots, are you sure that the files are in the required directory structure?")
 
     def train_evaluate(self, path = None, show_progressbar = False, merge_window = 10, cut_length = 2.2,
                        output_path: str = '.out'):
@@ -146,9 +146,9 @@ class Trainer:
         print(results_df.to_string(index = False))
 
 
-    def train(self, training_data_path, win_length, window_type, overlap_percentage, output_path: str = '.out',
+    def train(self, training_data_path, win_length, hop_length, window_type, overlap_percentage, output_path: str = '.out',
               show_progressbar = True):
-        model = SvmModel(win_length, hop_length = win_length, window_type = window_type,
+        model = SvmModel(win_length, hop_length = hop_length, window_type = window_type,
                          percentage_overlap = overlap_percentage)
         try:
             model.fit(training_data_path, show_progressbar)
