@@ -18,6 +18,7 @@ from beggingcallsanalyzer.plotting.plotting import (
 from beggingcallsanalyzer.plotting.summary import create_summary_csv
 from beggingcallsanalyzer.training.trainer import Trainer
 from beggingcallsanalyzer.utilities.exceptions import ArgumentError
+from beggingcallsanalyzer.utilities.validators import is_valid_audio
 
 app = typer.Typer()
 
@@ -51,7 +52,8 @@ def oss(
         df_summary = pd.DataFrame()
         incorrect_folder_structure = False
         for recordings_chunk in chunked(recordings, processing_batch_size):
-            predictions = model.predict(recordings_chunk, merge_window = merge_window, cut_length = cut_length,
+            valid_recordings = [path for path in recordings_chunk if is_valid_audio(path)]
+            predictions = model.predict(valid_recordings, merge_window = merge_window, cut_length = cut_length,
                                             threshold=threshold, batch_size=inference_batch_size, contact_cut_length=contact_cut_length, contact_merge_window=contact_merge_window,
                                             contact_threshold=contact_threshold)
             
