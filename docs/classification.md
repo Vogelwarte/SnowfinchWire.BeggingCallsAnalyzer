@@ -24,7 +24,7 @@ In this case, the input parameters are as follows (where you should put them wil
     * `create_plots` - whether or not to create summary csv and plots. Will emit a warning if true and a proper file directory is not provided, though the prediction will procees without error. (default: true).
 3. Run one of the following command in the project directory depenging on which model you chose `SnowfinchWire.BeggingCallsAnalyzer` (NOT `SnowfinchWire.BeggingCallsAnalyzer/beggingcallsanalyzer`). This directory should contain the `classify.py` script.
 ```
-py -3.9 classify.py fe classify_fe.yml
+py -3.9 classify.py fe --config classify_fe.yml
 ```
 
 ### Using the deep learning model (OpenSoundscape)
@@ -45,5 +45,5 @@ py -3.9 classify.py fe classify_fe.yml
     * `create_plots` - whether or not to create summary csv and plots. Will emit a warning if true and a proper file directory is not provided, though the prediction will procees without error. (default: true).
 3. Run one of the following command in the project directory depenging on which model you chose `SnowfinchWire.BeggingCallsAnalyzer` (NOT `SnowfinchWire.BeggingCallsAnalyzer/beggingcallsanalyzer`). This directory should contain the `classify.py`.
 ```
-py -3.9 classify.py oss classify_oss.yml
+py -3.9 classify.py oss --config classify_oss.yml
 ```
