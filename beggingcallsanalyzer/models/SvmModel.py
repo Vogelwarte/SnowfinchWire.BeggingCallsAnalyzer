@@ -70,14 +70,17 @@ class SvmModel:
         flac: Path
         results = {}
         for flac in track(input_files, disable = not show_progressbar):
-            audio_data, sample_rate = sf.read(flac)
-            df = extract_features(audio_data, sample_rate, self.win_length, self.hop_length, window_type=self.window_type)
-            y_pred = self._pipeline.predict(df)
-            y_processed = post_process(y_pred, self.win_length, self.hop_length, merge_window, cut_length)
-            results[flac] = {
-                'duration': len(audio_data) / float(sample_rate),
-                'predictions': to_audacity_labels(y_processed, len(audio_data) / float(sample_rate), self.win_length, self.hop_length) 
-            }
+            try:
+                audio_data, sample_rate = sf.read(flac)
+                df = extract_features(audio_data, sample_rate, self.win_length, self.hop_length, window_type=self.window_type)
+                y_pred = self._pipeline.predict(df)
+                y_processed = post_process(y_pred, self.win_length, self.hop_length, merge_window, cut_length)
+                results[flac] = {
+                    'duration': len(audio_data) / float(sample_rate),
+                    'predictions': to_audacity_labels(y_processed, len(audio_data) / float(sample_rate), self.win_length, self.hop_length) 
+                }
+            except sf.SoundFileError:
+                print(f"Could not process file {flac}, skipping...")
         return results
 
     def evaluate(self, test_path, merge_window = 10, cut_length = 2.2, show_progressbar = True, extension = 'flac') -> \
