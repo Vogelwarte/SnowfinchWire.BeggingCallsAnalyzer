@@ -40,12 +40,9 @@ def oss(
             float, typer.Option(help="Contact observations at most this long will be discarded")] = 2,
         threshold: Annotated[float, typer.Option(help="Decision threshold for feeding classification")] = 0.85,
         contact_threshold: Annotated[float, typer.Option(help="Decision threshold for contact classification")] = 0.887,
-        processing_batch_size: Annotated[int, typer.Option(
-            help="The number of files that will be predicted simultaneously (the higher the number, "
-                 "the higher the RAM usage)")] = 1,
         inference_batch_size: Annotated[int, typer.Option(
             help="The number of input samples used  in inference (the higher the number, "
-                 "the higher the VRAM usage)")] = 1,
+                 "the higher the VRAM usage)")] = 50,
         create_plots: Annotated[bool, typer.Option(help="Whether or not to create plots")] = False
 ):
     model = CnnModel.from_file(model_path)
@@ -59,25 +56,24 @@ def oss(
         #rglob can be case insesnsitive from Python 3.12 and above.
         #to avoid this, we should manually filter thje WAVs
         all_file_paths = input_directory_path.rglob(f'*.*')
-        extension = ".wav"
-        file_paths = [f for f in all_file_paths if f.suffix.lower() in [extension]]
+        extensions = [".flac", ".wav"]
+        file_paths = [f for f in all_file_paths if f.suffix.lower() in extensions]
         file_paths.sort()
         recordings = list(file_paths)
         prediction_progress = progress.add_task(description="Running prediction...", total=len(recordings))
         df_summary = pd.DataFrame()
         incorrect_folder_structure = False
-        for recordings_chunk in chunked(recordings, processing_batch_size):
-            valid_recordings = [path for path in recordings_chunk if is_valid_audio(path)]
-            if len(valid_recordings) > 0:
-                predictions = model.predict(valid_recordings, merge_window=merge_window, cut_length=cut_length,
-                                        threshold=threshold, batch_size=inference_batch_size,
-                                        contact_cut_length=contact_cut_length,
-                                        contact_merge_window=contact_merge_window,
-                                        contact_threshold=contact_threshold)
-            else:
-                progress.print(f'[orange1][Warning]:[/] {", ".join(recordings_chunk)} are/is not a valid soundfile, skipping')
-                progress.update(prediction_progress, advance=len(recordings_chunk))
+        for recording_file_path in recordings:
+            if not is_valid_audio(recording_file_path):
+                progress.print(f'[orange1][Warning]:[/] {str(recording_file_path)} is not a valid soundfile, skipping')
+                progress.update(prediction_progress, advance=1)
                 continue
+            progress.print(f"Processing: {recording_file_path}")
+            predictions = model.predict(recordings=[recording_file_path], merge_window=merge_window, cut_length=cut_length,
+                                    threshold=threshold, batch_size=inference_batch_size,
+                                    contact_cut_length=contact_cut_length,
+                                    contact_merge_window=contact_merge_window,
+                                    contact_threshold=contact_threshold)
             if not incorrect_folder_structure and (bad_files := [f.name for f in
                                                                  filter(lambda k: k.parent.parent.parent != input_directory_path,
                                                                         predictions.keys())]):
@@ -88,16 +84,16 @@ def oss(
                 incorrect_folder_structure = True
                 output_path = output_directory
 
-            if not incorrect_folder_structure:
-                summary = create_summary_csv(predictions, output_directory, extension)
-                df_summary = pd.concat([df_summary, summary])
+            #if not incorrect_folder_structure:
+            #    summary = create_summary_csv(predictions, output_directory, extension)
+            #    df_summary = pd.concat([df_summary, summary])
 
             for filename, data in predictions.items():
                 if not incorrect_folder_structure:
                     output_path = Path(f'{output_directory}/{filename.parent.parent.name}/{filename.parent.name}/')
                 output_path.mkdir(parents=True, exist_ok=True)
                 data['predictions'].to_csv(output_path / f'{filename.stem}.txt', header=None, index=None, sep='\t')
-            progress.update(prediction_progress, advance=len(recordings_chunk))
+            progress.update(prediction_progress, advance=1)
 
     if create_plots and not incorrect_folder_structure:
         summary_path = f'{output_directory}/summary.csv'

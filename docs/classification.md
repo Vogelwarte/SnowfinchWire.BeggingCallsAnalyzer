@@ -28,7 +28,7 @@ py -3.9 classify.py fe --config classify_fe.yml
 ```
 
 ### Using the deep learning model (OpenSoundscape)
-1. The files that will be undergoing prediction should all be copied to a desired folder.
+1. All the FLAC and WAV file from the input direcotry (recursively) will be processed. The file extension test is case insensitive.
 2. Fill the `classify_oss.yml` configuration file with the following:
     * `model_path` - path to the file extraction model (with `.model` extension).
     * `input_directory` - directory with optional subdirectories containing the files that will undergo prediction.
@@ -37,13 +37,11 @@ py -3.9 classify.py fe --config classify_fe.yml
     * `cut_length` - Feeding events at most this long will be deleted (default: 2.2).
     * `contact_merge_window` - Contact events at most this number of seconds apart will be joined together (default: 10).
     * `contact_cut_length` - Contact events at most this long will be deleted (default: 2).
-    * `extension` - file extension without the leading dot (default: flac).
     * `threshold` - values above the threshold are classified as feeding. If the model classified feeding too often, consider increasing this value, if it classifies feeding too rarely, consider decreasing it. (default: 0.85).
     * `contact_threshold` - values above the threshold are classified as feeding. If the model classified contact too often, consider increasing this value, if it classifies contact too rarely, consider decreasing it. (default: 0.887).
-    * `processing_batch_size` - the number of files that will be processed simultaneously. The bigger this number, the higher the memory requirements (default: 100).
     * `inference_batch_size` - batch size used by the neural network.  The bigger this number, the higher the memory and CPU requirements(default: 100).
     * `create_plots` - whether or not to create summary csv and plots. Will emit a warning if true and a proper file directory is not provided, though the prediction will procees without error. (default: true).
-3. Run one of the following command in the project directory depenging on which model you chose `SnowfinchWire.BeggingCallsAnalyzer` (NOT `SnowfinchWire.BeggingCallsAnalyzer/beggingcallsanalyzer`). This directory should contain the `classify.py`.
+3. Run one of the following command in the project directory depending on which model you chose `SnowfinchWire.BeggingCallsAnalyzer` (NOT `SnowfinchWire.BeggingCallsAnalyzer/beggingcallsanalyzer`). This directory should contain the `classify.py`.
 ```
 py -3.9 classify.py oss --config classify_oss.yml
 ```
