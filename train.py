@@ -19,7 +19,7 @@ def oss(
             config: Annotated[str, typer.Option(help="Path to a yaml file containing desired options set", callback=yaml_conf_callback, is_eager=True)] = None
         ):
     model = CnnModel(win_length, batch_size, num_workers, epochs)
-    model.fit(training_data_path)
+    model.fit(train_path=training_data_path, output_path=output_path)
     model.save(output_path)
     
 

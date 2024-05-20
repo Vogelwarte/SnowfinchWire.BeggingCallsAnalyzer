@@ -23,7 +23,7 @@ class CnnModel:
         self._model = CNN('resnet18', classes=['feeding', 'contact'], sample_duration=win_length)
         use_resample_loss(self._model)
 
-    def fit(self, train_path: Union[str, Path], onehot_labels_file = 'one-hot_labels.csv') -> CnnModel:
+    def fit(self, train_path: Union[str, Path], output_path: Path, onehot_labels_file = 'one-hot_labels.csv') -> CnnModel:
         """
         Trains the model on all files in a directory. 
         :param train_path: path to a directory containing training data
@@ -46,7 +46,7 @@ class CnnModel:
         train_df = labels.set_index('filename')
         self._model.train(
             train_df=train_df,
-            save_path=None, 
+            save_path=output_path,
             epochs=self.epochs,
             batch_size=self.batch_size,
             num_workers=self.num_workers, 
