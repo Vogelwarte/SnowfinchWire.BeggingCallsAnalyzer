@@ -33,14 +33,14 @@ class CnnModel:
         """
         labels = pd.read_csv(f'{train_path}/{onehot_labels_file}')
 
-        if not labels.columns.str.contains('feeding'):
+        if 'feeding' not in labels.columns.values:
             warnings.warn("")
-        if not labels.columns.str.contains('contact'):
+        if 'contact' not in labels.columns.values:
             warnings.warn("")
-        if not labels.columns.str.contains('filename'):
+        if 'filename' not in labels.columns.values:
             warnings.warn("")
 
-        redundant_columns = [c for c in labels.columns.str if c not in {'filename', 'feeding', 'contact'}]
+        redundant_columns = [c for c in labels.columns.values if c not in {'filename', 'feeding', 'contact'}]
         labels = labels.drop(columns=redundant_columns)
 
         train_df = labels.set_index('filename')
