@@ -1,4 +1,5 @@
 import argparse
+import math
 import os
 import sys
 from datetime import datetime
@@ -159,19 +160,21 @@ def list_of_files_ex(dir: Path, extensions: List[str]) -> List[Path]:
                     all_files.append(Path(dirPath) / f)
     return all_files
 
-def dictionary_by_bare_name(files: List[Path], suffix_to_remove: str) -> Dict[str, Path]:
+def dictionary_by_bare_name(files: List[Path], suffixes_to_remove: List[str]) -> Dict[str, Path]:
     #    print("checking the files"+str(files))
     d: Dict[str, Path] = {}
     for f in files:
-        if f.name.lower().endswith(suffix_to_remove.lower()):
-            bn = f.name[0:-len(suffix_to_remove)]
+        found_suffix: List[str] = [ext for ext in suffixes_to_remove if f.name.lower().endswith(ext)]
+        if len(found_suffix) > 0:
+            suffix = found_suffix[0]
+            bn = f.name[0:-len(suffix)]
             #print("[" + bn + "] -> " + str(f))
             if not d.get(bn, False):
                 d[bn] = f
             else:
                 sys.stderr.write("[" + bn + "] is not a unique name: \n" + str(f) + "\nor\n" +  str(d[bn]) + " - kept as first")
         else:
-            sys.stderr.write(str(f) + " doesn't have the expecetd suffix [" + suffix_to_remove + "]")
+            sys.stderr.write(f"{str(f)} doesn't have any of the expected suffixes: {suffixes_to_remove}")
     return d
 
 
@@ -266,13 +269,19 @@ def get_annotation_labels(fp_list:List[Path]) -> List[str]:
             pass
     return labels.keys()
 
+def find_audio_file(name_stem: str, audio_files_dict: Dict[str, Path]) -> (str, Path):
+    for k, v in audio_files_dict.items():
+        if name_stem.startswith(k):
+            return v,k
+    raise FileNotFoundError(name_stem + ".WAV/FLAC")
+
 
 def do_the_butchery(args):
     chunk_length: int = 2.0
     input_extension = ".txt" #".Table.1.selections.txt"  # ".wav.csv"
     chunk_def_files = list_of_files(args.input_dir, input_extension)
-    af_extension = ".flac" #, ".wav"
-    audio_files = dictionary_by_bare_name(list_of_files(args.input_dir, af_extension), af_extension)
+    af_extensions = [".flac", ".wav"] #, ".wav"
+    audio_files = dictionary_by_bare_name(list_of_files_ex(args.input_dir, af_extensions), af_extensions)
     # print(str(audio_files))
     odir: Path = Path(args.output_directory)
     if not odir.exists():
@@ -291,10 +300,8 @@ def do_the_butchery(args):
                 chunk_definitions: List[AudacityLabel] = AudacityLabel.parse_file(cdf)
                 c_count = 0
                 not_annot = 0
-                name_stem: str = str(cdf.name)[0:-len(input_extension)-4]  # remove the extension and the _AGC or _SDI
-                audio_file = audio_files.get(name_stem, None)
-                if audio_file is None:
-                    raise FileNotFoundError(name_stem)
+                name_stem: str = str(cdf.name)[0:-len(input_extension)]  # remove the extension and the _AGC or _SDI
+                audio_file, name_stem = find_audio_file(name_stem, audio_files)
                 duration = librosa.get_duration(filename=audio_file)
                 if duration < chunk_length:
                     raise RuntimeError(f'audio file {name_stem} is too short ({duration}s) ')
