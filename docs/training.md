@@ -43,5 +43,5 @@ py -3.9 train.py fe train_fe.yml
     * `epochs` - maximum number of epochs used for learning
 4. Run one of the following command in the project directory depenging on which model you chose `SnowfinchWire.BeggingCallsAnalyzer` (NOT `SnowfinchWire.BeggingCallsAnalyzer/beggingcallsanalyzer`). This directory should contain the `train.py` script.
 ```
-py -3.9 train.py oss train_oss.yml
+py -3.9 train.py oss --config train_oss.yml
 ```

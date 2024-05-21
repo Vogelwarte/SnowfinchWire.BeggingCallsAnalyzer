@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import warnings
+import sklearn
 from pathlib import Path
 from typing import Literal, Union
 
@@ -23,7 +24,7 @@ class CnnModel:
         self._model = CNN('resnet18', classes=['feeding', 'contact'], sample_duration=win_length)
         use_resample_loss(self._model)
 
-    def fit(self, train_path: Union[str, Path], output_path: Path, onehot_labels_file = 'one-hot_labels.csv') -> CnnModel:
+    def fit(self, train_path: Union[str, Path], output_path: Path | str, onehot_labels_file = 'one-hot_labels.csv') -> CnnModel:
         """
         Trains the model on all files in a directory. 
         :param train_path: path to a directory containing training data
@@ -44,6 +45,9 @@ class CnnModel:
         labels = labels.drop(columns=redundant_columns)
 
         train_df = labels.set_index('filename')
+        train_df = train_df[self._model.classes]
+        train_df.to_csv(output_path / Path("training_df.csv"))
+
         self._model.train(
             train_df=train_df,
             save_path=output_path,
