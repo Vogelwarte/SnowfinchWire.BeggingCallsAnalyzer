@@ -44,6 +44,8 @@ class CnnModel:
         redundant_columns = [c for c in labels.columns.values if c not in {'filename', 'feeding', 'contact'}]
         labels = labels.drop(columns=redundant_columns)
 
+        labels.filename = [str(train_path / Path(f)) for f in labels.filename]
+
         train_df = labels.set_index('filename')
         train_df = train_df[self._model.classes]
         train_df.to_csv(output_path / Path("training_df.csv"))
