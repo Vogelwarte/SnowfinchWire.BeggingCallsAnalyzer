@@ -21,7 +21,7 @@ class CnnModel:
         self.batch_size = batch_size
         self.num_workers=num_workers
         self.epochs = epochs
-        self._model = CNN('resnet18', classes=['feeding', 'contact'], sample_duration=win_length)
+        self._model = CNN('resnet18', classes=['feeding', 'contact', 'nothing'], sample_duration=win_length)
         use_resample_loss(self._model)
 
     def fit(self, train_path: Union[str, Path], output_path: Path | str, onehot_labels_file = 'one-hot_labels.csv') -> CnnModel:
@@ -33,15 +33,17 @@ class CnnModel:
         :return: fitted model
         """
         labels = pd.read_csv(f'{train_path}/{onehot_labels_file}')
-
+        labels.rename(columns={'_nothing': 'nothing'}, inplace=True)
         if 'feeding' not in labels.columns.values:
             warnings.warn("")
         if 'contact' not in labels.columns.values:
             warnings.warn("")
+        if 'nothing' not in labels.columns.values:
+            warnings.warn("")
         if 'filename' not in labels.columns.values:
             warnings.warn("")
 
-        redundant_columns = [c for c in labels.columns.values if c not in {'filename', 'feeding', 'contact'}]
+        redundant_columns = [c for c in labels.columns.values if c not in {'filename', 'feeding', 'contact', 'nothing'}]
         labels = labels.drop(columns=redundant_columns)
 
         labels.filename = [str(train_path / Path(f)) for f in labels.filename]
