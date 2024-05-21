@@ -2,19 +2,32 @@ from __future__ import annotations
 
 import os
 import warnings
-import sklearn
 from pathlib import Path
-from typing import Literal, Union
+from typing import Literal, Union, Dict
 
-import numpy as np
 import pandas as pd
+import sklearn
+from matplotlib import pyplot as plt
 from opensoundscape import CNN
 from opensoundscape.metrics import predict_multi_target_labels
 from opensoundscape.torch.models.cnn import load_model, use_resample_loss
+from pandas import DataFrame
 
 from beggingcallsanalyzer.training.postprocessing import post_process
 
+def save_loss_history(model_id: str, out_dir: Path, loss_history: Dict[int, float]):
+    train_graph_fn: str = str(out_dir / Path(f'{model_id}_loss_history.png'))
+    loss_history_fn: Path = out_dir / Path(f'{model_id}_loss_history.csv')
 
+    plt.scatter(loss_history.keys(), loss_history.values(), label=model_id)
+    plt.title(f'Loss history')
+    plt.xlabel('epoch')
+    plt.ylabel('loss')
+    plt.legend(loc='upper right')
+    plt.savefig(train_graph_fn)
+    loss_history_df: DataFrame = DataFrame.from_dict(data=loss_history, orient='index', columns=['loss'])
+    loss_history_df.index.name = 'epoch'
+    loss_history_df.to_csv(loss_history_fn, sep=';')
 class CnnModel:
     def __init__(self, win_length, batch_size=128, num_workers=14, epochs=7) -> None:
         self.win_length = win_length
@@ -54,6 +67,7 @@ class CnnModel:
 
         train_df, validation_df = sklearn.model_selection.train_test_split(all_df, test_size=0.1, random_state=0)
 
+
         self._model.train(
             train_df=train_df,
             validation_df=validation_df,
@@ -62,7 +76,10 @@ class CnnModel:
             batch_size=self.batch_size,
             num_workers=self.num_workers, 
         )
-        
+        save_loss_history(model_id=self._model.architecture_name,
+                          out_dir=output_path,
+                          loss_history=self._model.loss_hist)
+
         return self
 
     def predict(self, recordings: pd.DataFrame, threshold=0.85, merge_window = 10, cut_length = 2.2, contact_merge_window = 10, contact_cut_length = 3, 
@@ -129,3 +146,7 @@ class CnnModel:
         result = result.reset_index(names=['group', 'class']).drop(columns=['group'])[["start_time", "end_time", "class"]]
         result['class'] = class_name
         return result
+
+
+
+
