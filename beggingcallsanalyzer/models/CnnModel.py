@@ -46,12 +46,15 @@ class CnnModel:
 
         labels.filename = [str(train_path / Path(f)) for f in labels.filename]
 
-        train_df = labels.set_index('filename')
-        train_df = train_df[self._model.classes]
-        train_df.to_csv(output_path / Path("training_df.csv"))
+        all_df = labels.set_index('filename')
+        all_df = all_df[self._model.classes]
+        all_df.to_csv(output_path / Path("training_df.csv"))
+
+        train_df, validation_df = sklearn.model_selection.train_test_split(all_df, test_size=0.1, random_state=0)
 
         self._model.train(
             train_df=train_df,
+            validation_df=validation_df,
             save_path=output_path,
             epochs=self.epochs,
             batch_size=self.batch_size,
